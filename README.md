@@ -3,7 +3,7 @@
 > **A storage-first, privacy-centric markdown knowledge base with Deep Space Industrial aesthetics.**
 
 ![License](https://img.shields.io/badge/license-MIT-orange)
-![Version](https://img.shields.io/badge/version-2.5.0-white)
+![Version](https://img.shields.io/badge/version-2.6.0-white)
 ![Status](https://img.shields.io/badge/system-OPERATIONAL-green)
 
 ## 🪐 Overview
@@ -12,11 +12,17 @@ GitNotes is a standalone, client-side Single Page Application (SPA) designed for
 
 **Key Features:**
 *   **Local-First Architecture:** All data is stored in the browser's `localStorage`. No database required.
+*   **Data Sovereignty:** Built-in Backup (JSON Export) and Restore functionality to prevent data loss.
+*   **Command Interface:** Global `Cmd+K` / `Ctrl+K` command palette for instant file and repository navigation.
 *   **Dual-Mode Access:**
     *   **Visitor Mode:** Read-only access to public repositories.
     *   **Admin Mode:** Full create/edit/delete capabilities (Password protected).
-*   **Markdown Editor:** Real-time rendering with GFM (GitHub Flavored Markdown) support.
-*   **Responsive Design:** Optimized for desktop terminals and mobile datapads.
+*   **Advanced Editor:** 
+    *   Split-View (Write/Preview)
+    *   Syntax Highlighting (Prism)
+    *   GFM Tables & Frontmatter support
+    *   Quick Format Toolbar
+*   **PWA Ready:** Installable as a native-like app on desktop and mobile.
 
 ## 🛠️ Tech Stack
 
@@ -24,6 +30,7 @@ GitNotes is a standalone, client-side Single Page Application (SPA) designed for
 *   **Styling:** Tailwind CSS (Custom Zenith Config)
 *   **Icons:** Lucide React
 *   **Routing:** React Router DOM v7
+*   **Markdown:** React Markdown + Remark GFM + Syntax Highlighter
 
 ## 🚀 Deployment (VPS Guide)
 
@@ -81,10 +88,10 @@ server {
 **Where is my data?**
 Your data lives in your browser's `localStorage` under the key `gitnotes_data_v1`.
 
-**Limitations:**
-*   **Device Specific:** Data on your phone is separate from data on your laptop.
+**Limitations & Safety:**
+*   **Storage Limit:** Browsers typically limit LocalStorage to ~5MB. The "Maintenance" modal tracks usage.
 *   **Browser Cache:** If you "Clear Site Data", your notes will be erased.
-*   **Backup:** Currently manual. You can copy the raw JSON string from DevTools -> Application -> Local Storage for backup.
+*   **Backup:** **CRITICAL.** Use the "Maintenance" -> "Export Backup" feature frequently to save your data to a JSON file.
 
 ## 📜 License
 

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Repository } from '../types';
 import { Icons } from '../components/Icon';
 import MarkdownPreview from '../components/MarkdownPreview';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
+import EditorToolbar from '../components/EditorToolbar';
 
 interface FileEditorProps {
   repos: Repository[];
@@ -12,15 +13,17 @@ interface FileEditorProps {
   isAuthenticated: boolean;
 }
 
+type ViewMode = 'write' | 'preview' | 'split';
+
 const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFile, isAuthenticated }) => {
   const { repoId, fileId } = useParams<{ repoId: string; fileId: string }>();
   const navigate = useNavigate();
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
   
   const repo = repos.find(r => r.id === repoId);
   const file = repo?.files.find(f => f.id === fileId);
 
-  // Default to rendering mode for visitors
-  const [isEditing, setIsEditing] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('preview');
   const [content, setContent] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -28,12 +31,10 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
   useEffect(() => {
     if (file) {
       setContent(file.content);
-      // Auto-switch to edit mode only for authenticated users upon opening
-      if (isAuthenticated) {
-          setIsEditing(false); // keep false initially to encourage reading first
-      }
+      // Auto-switch to preview mode for visitors, write for admin if desired, 
+      // but 'preview' is a safe default for reading.
     }
-  }, [file, isAuthenticated]);
+  }, [file]);
 
   if (!repo || !file) {
     return <div className="h-screen flex items-center justify-center font-mono text-zenith-orange">ERROR: FILE DATA CORRUPTED OR MISSING</div>;
@@ -56,6 +57,28 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
       navigate(`/${repoId}`);
   }
 
+  const handleInsert = (prefix: string, suffix: string = '') => {
+    if (!textAreaRef.current) return;
+    const start = textAreaRef.current.selectionStart;
+    const end = textAreaRef.current.selectionEnd;
+    const text = textAreaRef.current.value;
+    const before = text.substring(0, start);
+    const selection = text.substring(start, end);
+    const after = text.substring(end);
+
+    const newText = before + prefix + selection + suffix + after;
+    handleContentChange(newText);
+    
+    // Defer focus to allow React render
+    setTimeout(() => {
+      if(textAreaRef.current) {
+        textAreaRef.current.focus();
+        textAreaRef.current.selectionStart = start + prefix.length;
+        textAreaRef.current.selectionEnd = end + prefix.length;
+      }
+    }, 0);
+  };
+
   const lineCount = content.split('\n').length;
 
   return (
@@ -77,16 +100,25 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
              {/* Mode Switcher */}
              <div className="flex border border-zenith-border p-0.5 bg-zenith-surface">
                  <button 
-                    onClick={() => setIsEditing(true)}
-                    className={`px-4 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all ${isEditing ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'}`}
+                    onClick={() => setViewMode('write')}
+                    className={`px-3 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all flex items-center gap-2 ${viewMode === 'write' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'}`}
+                    title="Write Mode"
                  >
-                    Write
+                    <Icons.Edit size={12} /> <span className="hidden sm:inline">Write</span>
                  </button>
                  <button 
-                    onClick={() => setIsEditing(false)}
-                    className={`px-4 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all ${!isEditing ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'}`}
+                    onClick={() => setViewMode('split')}
+                    className={`px-3 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all flex items-center gap-2 border-l border-r border-zenith-border ${viewMode === 'split' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'}`}
+                    title="Split View"
                  >
-                    Render
+                    <Icons.Layout size={12} /> <span className="hidden sm:inline">Split</span>
+                 </button>
+                 <button 
+                    onClick={() => setViewMode('preview')}
+                    className={`px-3 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all flex items-center gap-2 ${viewMode === 'preview' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'}`}
+                    title="Preview Mode"
+                 >
+                    <Icons.File size={12} /> <span className="hidden sm:inline">Render</span>
                  </button>
              </div>
 
@@ -111,27 +143,37 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
       {/* Main Content Area */}
       <div className="flex-1 overflow-hidden relative flex">
          
-         {/* Line Numbers (Dynamic) */}
-         <div className="hidden md:block w-12 bg-zenith-surface border-r border-zenith-border text-right py-6 pr-3 font-mono text-xs text-zenith-border select-none overflow-hidden">
-             {Array.from({length: Math.max(lineCount, 20)}).map((_, i) => <div key={i}>{i+1}</div>)}
-         </div>
-
-         <div className="flex-1 relative overflow-auto">
-             {isEditing ? (
-                 <textarea
+         {/* Write Panel */}
+         {(viewMode === 'write' || viewMode === 'split') && (
+           <div className={`flex flex-col border-r border-zenith-border ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
+             {isAuthenticated && <EditorToolbar onInsert={handleInsert} />}
+             <div className="flex flex-1 overflow-hidden">
+                {/* Line Numbers */}
+                <div className="hidden sm:block w-10 bg-zenith-surface border-r border-zenith-border text-right py-4 pr-2 font-mono text-xs text-zenith-border select-none overflow-hidden shrink-0">
+                    {Array.from({length: Math.max(lineCount, 20)}).map((_, i) => <div key={i}>{i+1}</div>)}
+                </div>
+                
+                <textarea
+                    ref={textAreaRef}
                     readOnly={!isAuthenticated}
                     value={content}
                     onChange={(e) => handleContentChange(e.target.value)}
-                    className={`w-full h-full bg-zenith-bg text-zenith-text font-mono text-sm p-6 resize-none outline-none transition-colors leading-relaxed ${!isAuthenticated ? 'cursor-not-allowed text-zenith-muted' : 'focus:bg-[#050505]'}`}
+                    className={`w-full h-full bg-zenith-bg text-zenith-text font-mono text-sm p-4 resize-none outline-none transition-colors leading-relaxed ${!isAuthenticated ? 'cursor-not-allowed text-zenith-muted' : 'focus:bg-[#050505]'}`}
                     spellCheck={false}
                     placeholder={!isAuthenticated ? "Editing is disabled in visitor mode." : "Start typing..."}
-                 />
-             ) : (
-                 <div className="p-8 max-w-4xl mx-auto">
-                     <MarkdownPreview content={content} />
-                 </div>
-             )}
-         </div>
+                />
+             </div>
+           </div>
+         )}
+
+         {/* Preview Panel */}
+         {(viewMode === 'preview' || viewMode === 'split') && (
+           <div className={`flex-1 overflow-auto bg-zenith-bg ${viewMode === 'split' ? 'bg-[#080808]' : ''}`}>
+               <div className={`p-8 mx-auto ${viewMode === 'split' ? 'max-w-none' : 'max-w-4xl'}`}>
+                   <MarkdownPreview content={content} />
+               </div>
+           </div>
+         )}
 
       </div>
       

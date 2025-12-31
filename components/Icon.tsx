@@ -18,7 +18,21 @@ import {
   Menu,
   X,
   Settings,
-  AlertTriangle
+  AlertTriangle,
+  Download,
+  Upload,
+  Layout,
+  LayoutTemplate,
+  Command,
+  Database,
+  Bold,
+  Italic,
+  List,
+  Heading1,
+  Link as LinkIcon,
+  Quote,
+  Code,
+  Image
 } from 'lucide-react';
 
 export const Icons = {
@@ -40,5 +54,19 @@ export const Icons = {
   Menu,
   Close: X,
   Settings,
-  Alert: AlertTriangle
+  Alert: AlertTriangle,
+  Download,
+  Upload,
+  Layout,
+  LayoutTemplate,
+  Command,
+  Database,
+  Bold,
+  Italic,
+  List,
+  Heading: Heading1,
+  Link: LinkIcon,
+  Quote,
+  Code,
+  Image
 };

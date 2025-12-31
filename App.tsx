@@ -7,8 +7,11 @@ import RepositoryView from './pages/RepositoryView';
 import FileEditor from './pages/FileEditor';
 import LoginModal from './components/LoginModal';
 import SocialBar from './components/SocialBar';
+import GlobalSearch from './components/GlobalSearch';
+import SystemSettingsModal from './components/SystemSettingsModal';
 import { loadRepositories, saveRepositories } from './services/storage';
 import { Repository } from './types';
+import { Icons } from './components/Icon';
 
 const ADMIN_PASSWORD = 'wildsalt3980';
 
@@ -17,6 +20,10 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  
+  // New Modals
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     const data = loadRepositories();
@@ -29,6 +36,18 @@ function App() {
       saveRepositories(repos);
     }
   }, [repos, loading]);
+
+  // Global Key Listener for Search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleLogin = (password: string) => {
     if (password === ADMIN_PASSWORD) {
@@ -138,6 +157,10 @@ function App() {
       if (!isAuthenticated) return;
       setRepos(prevRepos => prevRepos.filter(r => r.id !== repoId));
   }
+  
+  const handleImportData = (newRepos: Repository[]) => {
+      setRepos(newRepos);
+  }
 
   if (loading) {
       return <div className="h-screen bg-zenith-bg text-zenith-text flex items-center justify-center font-mono tracking-widest text-xs">INITIALIZING SYSTEM...</div>;
@@ -194,9 +217,15 @@ function App() {
             <div className="text-[10px] tracking-widest text-zenith-muted font-mono uppercase flex items-center gap-4 opacity-60 hover:opacity-100 transition-opacity">
                 <span className="">System Status: <span className={isAuthenticated ? "text-zenith-orange" : "text-white"}>{isAuthenticated ? 'Admin' : 'Guest'}</span></span>
                 <span className="w-px h-3 bg-zenith-muted"></span>
-                <span className="">Encrypted: Local</span>
+                <button onClick={() => setIsSearchOpen(true)} className="hover:text-white flex items-center gap-1"><Icons.Command size={10}/> CMD+K</button>
+                {isAuthenticated && (
+                   <>
+                     <span className="w-px h-3 bg-zenith-muted"></span>
+                     <button onClick={() => setIsSettingsOpen(true)} className="hover:text-white flex items-center gap-1"><Icons.Database size={10}/> MAINTENANCE</button>
+                   </>
+                )}
                 <span className="w-px h-3 bg-zenith-muted"></span>
-                <span className="">Ver: 2.5.0 (Optimized)</span>
+                <span className="">Ver: 2.6.0</span>
             </div>
         </footer>
 
@@ -204,6 +233,19 @@ function App() {
             isOpen={isLoginModalOpen} 
             onClose={() => setIsLoginModalOpen(false)}
             onLogin={handleLogin}
+        />
+        
+        <GlobalSearch 
+            isOpen={isSearchOpen}
+            onClose={() => setIsSearchOpen(false)}
+            repos={repos}
+        />
+
+        <SystemSettingsModal 
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            repos={repos}
+            onImport={handleImportData}
         />
       </div>
     </Router>
