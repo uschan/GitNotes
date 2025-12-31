@@ -1,11 +1,95 @@
-<div align="center">
+# GITNOTES // ZENITH PROTOCOL
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+> **A storage-first, privacy-centric markdown knowledge base with Deep Space Industrial aesthetics.**
 
-  <h1>Built with AI Studio</h2>
+![License](https://img.shields.io/badge/license-MIT-orange)
+![Version](https://img.shields.io/badge/version-2.5.0-white)
+![Status](https://img.shields.io/badge/system-OPERATIONAL-green)
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## 🪐 Overview
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+GitNotes is a standalone, client-side Single Page Application (SPA) designed for personal document management. It mimics a GitHub-like repository structure but operates entirely within your browser's local environment using a "Zenith" industrial sci-fi UI design language.
 
-</div>
+**Key Features:**
+*   **Local-First Architecture:** All data is stored in the browser's `localStorage`. No database required.
+*   **Dual-Mode Access:**
+    *   **Visitor Mode:** Read-only access to public repositories.
+    *   **Admin Mode:** Full create/edit/delete capabilities (Password protected).
+*   **Markdown Editor:** Real-time rendering with GFM (GitHub Flavored Markdown) support.
+*   **Responsive Design:** Optimized for desktop terminals and mobile datapads.
+
+## 🛠️ Tech Stack
+
+*   **Core:** React 19, TypeScript, Vite
+*   **Styling:** Tailwind CSS (Custom Zenith Config)
+*   **Icons:** Lucide React
+*   **Routing:** React Router DOM v7
+
+## 🚀 Deployment (VPS Guide)
+
+Since GitNotes is a static site, you don't need Node.js running continuously on your server. You only need a web server (like Nginx, Apache, or Caddy) to serve the HTML/JS/CSS files.
+
+### 1. Build the Artifacts
+On your local machine (or CI/CD pipeline):
+
+```bash
+# Install dependencies
+npm install
+
+# Build for production
+npm run build
+```
+
+This will generate a `dist/` folder containing your static site.
+
+### 2. Configure Authentication (IMPORTANT)
+Before building, open `src/App.tsx` and change the default admin password:
+
+```typescript
+// App.tsx
+const ADMIN_PASSWORD = 'YOUR_SECURE_PASSWORD_HERE';
+```
+*Note: Since this is a client-side app, the password logic exists in the browser bundle. It is designed as a "privacy lock" against casual visitors, not military-grade encryption.*
+
+### 3. Nginx Configuration (Example)
+Upload the contents of the `dist/` folder to your VPS (e.g., `/var/www/gitnotes`).
+
+Add this configuration to your Nginx sites-enabled:
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    root /var/www/gitnotes;
+    index index.html;
+
+    # Handle SPA Routing (Redirect all 404s to index.html)
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Optional: Cache static assets
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+    }
+}
+```
+
+## 💾 Data Persistence
+
+**Where is my data?**
+Your data lives in your browser's `localStorage` under the key `gitnotes_data_v1`.
+
+**Limitations:**
+*   **Device Specific:** Data on your phone is separate from data on your laptop.
+*   **Browser Cache:** If you "Clear Site Data", your notes will be erased.
+*   **Backup:** Currently manual. You can copy the raw JSON string from DevTools -> Application -> Local Storage for backup.
+
+## 📜 License
+
+Designed by **WildSalt**.
+Licensed under MIT.
+
+---
+*End of Transmission // Zenith Systems*

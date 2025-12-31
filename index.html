@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GitNotes // ZENITH</title>
+    
+    <!-- Analytics -->
+    <script defer src="https://cloud.umami.is/script.js" data-website-id="8b7793a1-6800-4c47-a5a7-b46233f5c989"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              zenith: {
+                bg: '#030303',       // Void
+                surface: '#0F0F11',  // Surface
+                border: '#27272A',   // Zinc-800
+                light: '#3F3F46',    // Zinc-700
+                orange: '#FF4D00',   // International Orange
+                green: '#00E676',    // Signal Green
+                text: '#E4E4E7',     // Zinc-200
+                muted: '#52525B',    // Zinc-600
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+              mono: ['JetBrains Mono', 'IBM Plex Mono', 'monospace'],
+            },
+            letterSpacing: {
+              tighter: '-0.05em',
+              tight: '-0.025em',
+              normal: '0',
+              wide: '0.025em',
+              wider: '0.05em',
+              widest: '0.25em', // For CAPTIONS
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+      body {
+        background-color: #030303;
+        color: #E4E4E7;
+        font-family: 'Inter', sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* Custom Scrollbar for Industrial Feel */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #030303;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #27272A;
+        border-radius: 0px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #FF4D00;
+      }
+
+      /* Utility for Cut Corners */
+      .cut-corner {
+        clip-path: polygon(
+          0 0,
+          100% 0,
+          100% calc(100% - 12px),
+          calc(100% - 12px) 100%,
+          0 100%
+        );
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
+    "react-markdown": "https://esm.sh/react-markdown@^10.1.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.10.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "remark-gfm": "https://esm.sh/remark-gfm@^4.0.1",
+    "uuid": "https://esm.sh/uuid@^13.0.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
