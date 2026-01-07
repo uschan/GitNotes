@@ -1,97 +1,72 @@
-# GITNOTES // ZENITH PROTOCOL
+# GITNOTES // ZENITH CLOUD
 
-> **A storage-first, privacy-centric markdown knowledge base with Deep Space Industrial aesthetics.**
+> **A Supabase-powered, privacy-centric markdown knowledge base with Deep Space Industrial aesthetics.**
 
 ![License](https://img.shields.io/badge/license-MIT-orange)
-![Version](https://img.shields.io/badge/version-2.6.0-white)
-![Status](https://img.shields.io/badge/system-OPERATIONAL-green)
+![Version](https://img.shields.io/badge/version-3.0.0-white)
+![Status](https://img.shields.io/badge/system-CLOUD_SYNCED-green)
 
 ## 🪐 Overview
 
-GitNotes is a standalone, client-side Single Page Application (SPA) designed for personal document management. It mimics a GitHub-like repository structure but operates entirely within your browser's local environment using a "Zenith" industrial sci-fi UI design language.
+GitNotes 3.0 transforms from a local storage app to a cloud-synced productivity tool. It uses a **"Secret Key"** mechanism to identify users, allowing for instant, anonymous, cross-device synchronization without traditional email/password registration.
 
 **Key Features:**
-*   **Local-First Architecture:** All data is stored in the browser's `localStorage`. No database required.
-*   **Data Sovereignty:** Built-in Backup (JSON Export) and Restore functionality to prevent data loss.
-*   **Command Interface:** Global `Cmd+K` / `Ctrl+K` command palette for instant file and repository navigation.
-*   **Dual-Mode Access:**
-    *   **Visitor Mode:** Read-only access to public repositories.
-    *   **Admin Mode:** Full create/edit/delete capabilities (Password protected).
-*   **Advanced Editor:** 
-    *   Split-View (Write/Preview)
-    *   Syntax Highlighting (Prism)
-    *   GFM Tables & Frontmatter support
-    *   Quick Format Toolbar
-*   **PWA Ready:** Installable as a native-like app on desktop and mobile.
+*   **Supabase Backend:** Real-time data persistence via PostgreSQL.
+*   **Secret Key Auth:** Generate a key on one device, paste it on another to sync. No email required.
+*   **Quick Capture:** Dedicated interface for rapidly logging thoughts, code snippets, and journal entries.
+*   **Command Interface:** Global `Cmd+K` / `Ctrl+K` command palette.
+*   **Advanced Editor:** Split-View, Syntax Highlighting, Toolbar.
 
-## 🛠️ Tech Stack
+## 🛠️ Setup Guide
 
-*   **Core:** React 19, TypeScript, Vite
-*   **Styling:** Tailwind CSS (Custom Zenith Config)
-*   **Icons:** Lucide React
-*   **Routing:** React Router DOM v7
-*   **Markdown:** React Markdown + Remark GFM + Syntax Highlighter
+### 1. Supabase Configuration
+1. Create a project at [supabase.com](https://supabase.com).
+2. Run the SQL script found in `sql/schema.sql` (or see below) in your Supabase SQL Editor.
+3. Get your `Project URL` and `anon key` from API Settings.
 
-## 🚀 Deployment (VPS Guide)
+### 2. Environment Variables
+Create a `.env` file in the root directory:
 
-Since GitNotes is a static site, you don't need Node.js running continuously on your server. You only need a web server (like Nginx, Apache, or Caddy) to serve the HTML/JS/CSS files.
+```env
+VITE_SUPABASE_URL=your_project_url
+VITE_SUPABASE_ANON_KEY=your_anon_key
+```
 
-### 1. Build the Artifacts
-On your local machine (or CI/CD pipeline):
+### 3. Database Schema
+Run this in Supabase SQL Editor:
+
+```sql
+create extension if not exists "uuid-ossp";
+
+create table repositories (
+  id uuid default uuid_generate_v4() primary key,
+  owner_id text not null,
+  name text not null,
+  description text,
+  is_private boolean default true,
+  updated_at timestamp with time zone default timezone('utc'::text, now()),
+  stars int default 0,
+  language text default 'Markdown'
+);
+
+create table files (
+  id uuid default uuid_generate_v4() primary key,
+  repo_id uuid references repositories(id) on delete cascade,
+  owner_id text not null,
+  name text not null,
+  content text,
+  language text default 'markdown',
+  size int default 0,
+  updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+```
+
+### 4. Run Locally
 
 ```bash
-# Install dependencies
 npm install
-
-# Build for production
-npm run build
+npm run dev
 ```
-
-This will generate a `dist/` folder containing your static site.
-
-### 2. Configure Authentication (IMPORTANT)
-Before building, open `src/App.tsx` and change the default admin password:
-
-```typescript
-// App.tsx
-const ADMIN_PASSWORD = 'YOUR_SECURE_PASSWORD_HERE';
-```
-*Note: Since this is a client-side app, the password logic exists in the browser bundle. It is designed as a "privacy lock" against casual visitors, not military-grade encryption.*
-
-### 3. Nginx Configuration (Example)
-Upload the contents of the `dist/` folder to your VPS (e.g., `/var/www/gitnotes`).
-
-Add this configuration to your Nginx sites-enabled:
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    root /var/www/gitnotes;
-    index index.html;
-
-    # Handle SPA Routing (Redirect all 404s to index.html)
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Optional: Cache static assets
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
-        expires 30d;
-        add_header Cache-Control "public, no-transform";
-    }
-}
-```
-
-## 💾 Data Persistence
-
-**Where is my data?**
-Your data lives in your browser's `localStorage` under the key `gitnotes_data_v1`.
-
-**Limitations & Safety:**
-*   **Storage Limit:** Browsers typically limit LocalStorage to ~5MB. The "Maintenance" modal tracks usage.
-*   **Browser Cache:** If you "Clear Site Data", your notes will be erased.
-*   **Backup:** **CRITICAL.** Use the "Maintenance" -> "Export Backup" feature frequently to save your data to a JSON file.
 
 ## 📜 License
 

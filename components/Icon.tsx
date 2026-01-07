@@ -32,7 +32,8 @@ import {
   Link as LinkIcon,
   Quote,
   Code,
-  Image
+  Image,
+  Zap
 } from 'lucide-react';
 
 export const Icons = {
@@ -68,5 +69,6 @@ export const Icons = {
   Link: LinkIcon,
   Quote,
   Code,
-  Image
+  Image,
+  Zap
 };
