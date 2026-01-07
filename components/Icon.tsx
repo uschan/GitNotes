@@ -33,7 +33,8 @@ import {
   Quote,
   Code,
   Image,
-  Zap
+  Zap,
+  Lock
 } from 'lucide-react';
 
 export const Icons = {
@@ -70,5 +71,6 @@ export const Icons = {
   Quote,
   Code,
   Image,
-  Zap
+  Zap,
+  Lock
 };

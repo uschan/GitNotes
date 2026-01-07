@@ -21,7 +21,7 @@ GitNotes 3.0 transforms from a local storage app to a cloud-synced productivity 
 
 ### 1. Supabase Configuration
 1. Create a project at [supabase.com](https://supabase.com).
-2. Run the SQL script found in `sql/schema.sql` (or see below) in your Supabase SQL Editor.
+2. Run the SQL script found below in your Supabase SQL Editor.
 3. Get your `Project URL` and `anon key` from API Settings.
 
 ### 2. Environment Variables
@@ -66,6 +66,52 @@ create table files (
 ```bash
 npm install
 npm run dev
+```
+
+## 🚀 Deployment (Self-Hosted / VPS)
+
+Since GitNotes is a SPA (Single Page Application), it can be hosted on any static file server (Nginx, Vercel, Netlify).
+
+### 1. Build
+```bash
+npm run build
+# Output will be in the /dist folder
+```
+
+### 2. Nginx Configuration (Recommended)
+If hosting on a VPS (Ubuntu/Debian), use this Nginx configuration to handle client-side routing.
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    root /var/www/gitnotes/dist;
+    index index.html;
+
+    # Gzip Compression
+    gzip on;
+    gzip_min_length 1000;
+    gzip_types text/plain text/css application/json application/javascript text/xml;
+
+    # SPA Routing (Critical)
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Cache Static Assets
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, no-transform";
+    }
+}
+```
+
+### 3. SSL (HTTPS)
+Secure your instance using Certbot:
+```bash
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d your-domain.com
 ```
 
 ## 📜 License
