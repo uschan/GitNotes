@@ -5,6 +5,7 @@ import { Icons } from '../components/Icon';
 import MarkdownPreview, { generateSlug } from '../components/MarkdownPreview';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import EditorToolbar from '../components/EditorToolbar';
+import LinkSelectorModal from '../components/LinkSelectorModal';
 // Use default import for Turndown, but handle 'default' property at runtime if needed
 // @ts-ignore
 import TurndownService from 'turndown';
@@ -27,6 +28,14 @@ interface TocItem {
   level: number;
 }
 
+interface Backlink {
+  fileId: string;
+  fileName: string;
+  repoId: string;
+  repoName: string;
+  context: string;
+}
+
 const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFile, isAuthenticated }) => {
   const { repoId, fileId } = useParams<{ repoId: string; fileId: string }>();
   const navigate = useNavigate();
@@ -40,12 +49,44 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
   const [hasChanges, setHasChanges] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [conversionStatus, setConversionStatus] = useState<string | null>(null);
+  const [isLinkSelectorOpen, setIsLinkSelectorOpen] = useState(false);
 
   useEffect(() => {
     if (file) {
       setContent(file.content);
     }
   }, [file]);
+
+  // --- Backlinks Logic ---
+  const backlinks = useMemo(() => {
+    if (!repoId || !fileId) return [];
+    const links: Backlink[] = [];
+    const targetLink = `/${repoId}/${fileId}`;
+
+    repos.forEach(r => {
+        r.files.forEach(f => {
+            // Don't link to self
+            if (f.id === fileId) return;
+
+            if (f.content.includes(targetLink)) {
+                // Try to find context (line containing the link)
+                const lines = f.content.split('\n');
+                const matchLine = lines.find(l => l.includes(targetLink)) || "Link found in document";
+                // Clean link syntax for display
+                const cleanContext = matchLine.replace(/\[(.*?)\]\(.*?\)/g, '$1').trim();
+
+                links.push({
+                    fileId: f.id,
+                    fileName: f.name,
+                    repoId: r.id,
+                    repoName: r.name,
+                    context: cleanContext.length > 60 ? cleanContext.substring(0, 60) + "..." : cleanContext
+                });
+            }
+        })
+    });
+    return links;
+  }, [repos, repoId, fileId]);
 
   // --- Table of Contents Logic ---
   const toc = useMemo(() => {
@@ -96,6 +137,11 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
   const handleContentChange = (val: string) => {
       setContent(val);
       setHasChanges(val !== file.content);
+
+      // Trigger Link Selector on '[['
+      if (val.endsWith('[[')) {
+          setIsLinkSelectorOpen(true);
+      }
   }
 
   const handleDeleteConfirm = () => {
@@ -114,9 +160,10 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
     const after = text.substring(end);
 
     const newText = before + prefix + selection + suffix + after;
-    handleContentChange(newText);
+    // Don't call handleContentChange directly to avoid double triggering logic if we used it, but here we just set state
+    setContent(newText);
+    setHasChanges(true);
     
-    // Defer focus to allow React render
     setTimeout(() => {
       if(textAreaRef.current) {
         textAreaRef.current.focus();
@@ -135,7 +182,8 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
       const after = currentText.substring(end);
       
       const newText = before + textToInsert + after;
-      handleContentChange(newText);
+      setContent(newText);
+      setHasChanges(true);
       
       setTimeout(() => {
           if (textAreaRef.current) {
@@ -145,6 +193,36 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
               textAreaRef.current.selectionEnd = newCursorPos;
           }
       }, 0);
+  };
+
+  const handleLinkSelect = (targetRepoId: string, targetFileId: string, targetName: string) => {
+      // Remove the '[[' trigger if it exists at the end
+      if (textAreaRef.current) {
+         const val = textAreaRef.current.value;
+         const end = textAreaRef.current.selectionEnd;
+         // Check if cursor is right after '[['
+         if (val.substring(end - 2, end) === '[[') {
+             // Remove '[[' and insert link
+             const before = val.substring(0, end - 2);
+             const after = val.substring(end);
+             const linkMd = `[${targetName.replace('.md', '')}](/${targetRepoId}/${targetFileId})`;
+             const newText = before + linkMd + after;
+             setContent(newText);
+             setHasChanges(true);
+             setTimeout(() => {
+                 if(textAreaRef.current) {
+                     textAreaRef.current.focus();
+                     textAreaRef.current.selectionStart = before.length + linkMd.length;
+                     textAreaRef.current.selectionEnd = before.length + linkMd.length;
+                 }
+             }, 0);
+             return;
+         }
+      }
+
+      // Normal insertion via button
+      const linkMd = `[${targetName.replace('.md', '')}](/${targetRepoId}/${targetFileId})`;
+      insertTextAtCursor(linkMd);
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -256,18 +334,18 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
       )}
 
       {/* File Toolbar */}
-      <div className="h-14 border-b border-zenith-border bg-zenith-bg flex items-center justify-between px-6 shrink-0 relative z-10">
-          <div className="flex items-center gap-4">
-              <Link to={`/${repoId}`} className="text-zenith-muted hover:text-white transition-colors">
+      <div className="h-14 border-b border-zenith-border bg-zenith-bg flex items-center justify-between px-4 sm:px-6 shrink-0 relative z-10 gap-2">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+              <Link to={`/${repoId}`} className="text-zenith-muted hover:text-white transition-colors shrink-0">
                   <Icons.ChevronRight className="rotate-180" size={18} />
               </Link>
-              <div className="h-6 w-px bg-zenith-border"></div>
-              <span className="font-mono text-sm text-white font-bold tracking-wide">{file.name}</span>
-              {hasChanges && <span className="text-[10px] bg-zenith-orange text-black px-2 py-0.5 font-bold font-mono">UNSAVED</span>}
-              {!isAuthenticated && <span className="text-[10px] border border-zenith-border text-zenith-muted px-2 py-0.5 font-mono uppercase">Read Only</span>}
+              <div className="h-6 w-px bg-zenith-border shrink-0"></div>
+              <span className="font-mono text-sm text-white font-bold tracking-wide truncate" title={file.name}>{file.name}</span>
+              {hasChanges && <span className="text-[10px] bg-zenith-orange text-black px-2 py-0.5 font-bold font-mono shrink-0">UNSAVED</span>}
+              {!isAuthenticated && <span className="text-[10px] border border-zenith-border text-zenith-muted px-2 py-0.5 font-mono uppercase shrink-0 hidden sm:block">Read Only</span>}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
              {/* Mode Switcher */}
              <div className="flex border border-zenith-border p-0.5 bg-zenith-surface">
                  <button 
@@ -300,7 +378,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                     disabled={!hasChanges}
                     className={`flex items-center gap-2 px-4 py-2 border text-xs font-mono tracking-widest uppercase transition-colors ${hasChanges ? 'border-zenith-orange text-zenith-orange hover:bg-zenith-orange hover:text-black' : 'border-zenith-border text-zenith-muted cursor-not-allowed'}`}
                  >
-                    <Icons.Save size={14} /> Save
+                    <Icons.Save size={14} /> <span className="hidden sm:inline">Save</span>
                  </button>
                  
                  <button onClick={() => setIsDeleteModalOpen(true)} className="p-2 text-zenith-muted hover:text-red-600 transition-colors">
@@ -317,7 +395,12 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
          {/* Write Panel */}
          {(viewMode === 'write' || viewMode === 'split') && (
            <div className={`flex flex-col border-r border-zenith-border ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
-             {isAuthenticated && <EditorToolbar onInsert={handleInsert} />}
+             {isAuthenticated && (
+                 <EditorToolbar 
+                    onInsert={handleInsert} 
+                    onLinkNote={() => setIsLinkSelectorOpen(true)} 
+                 />
+             )}
              <div className="flex flex-1 overflow-hidden">
                 {/* Line Numbers */}
                 <div className="hidden sm:block w-10 bg-zenith-surface border-r border-zenith-border text-right py-4 pr-2 font-mono text-xs text-zenith-border select-none overflow-hidden shrink-0">
@@ -332,7 +415,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                     onPaste={handlePaste}
                     className={`w-full h-full bg-zenith-bg text-zenith-text font-mono text-sm p-4 resize-none outline-none transition-colors leading-relaxed ${!isAuthenticated ? 'cursor-not-allowed text-zenith-muted' : 'focus:bg-[#050505]'}`}
                     spellCheck={false}
-                    placeholder={!isAuthenticated ? "Editing is disabled in visitor mode." : "Start typing... (Rich text pasted here will be auto-converted to Markdown)"}
+                    placeholder={!isAuthenticated ? "Editing is disabled in visitor mode." : "Start typing... Tip: Type '[[' to link another note."}
                 />
              </div>
            </div>
@@ -346,6 +429,36 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                <div className="flex-1 overflow-y-auto overflow-x-hidden">
                    <div className={`p-8 mx-auto ${viewMode === 'split' ? 'max-w-none' : 'max-w-4xl'}`}>
                        <MarkdownPreview content={content} />
+                       
+                       {/* Linked Mentions (Backlinks) Section */}
+                       {backlinks.length > 0 && (
+                           <div className="mt-16 pt-8 border-t border-zenith-border">
+                               <h3 className="text-sm font-mono font-bold text-zenith-muted uppercase tracking-widest mb-4 flex items-center gap-2">
+                                   <Icons.GitBranch size={14} /> Linked Mentions
+                               </h3>
+                               <div className="grid grid-cols-1 gap-3">
+                                   {backlinks.map((link, idx) => (
+                                       <div 
+                                            key={idx}
+                                            onClick={() => navigate(`/${link.repoId}/${link.fileId}`)}
+                                            className="group bg-zenith-surface border border-zenith-border p-4 cursor-pointer hover:border-zenith-orange transition-colors"
+                                       >
+                                           <div className="flex items-center justify-between mb-2">
+                                               <span className="text-white font-bold text-sm group-hover:text-zenith-orange transition-colors">
+                                                   {link.fileName}
+                                               </span>
+                                               <span className="text-[10px] text-zenith-muted font-mono bg-zenith-bg px-2 py-0.5 border border-zenith-border">
+                                                   {link.repoName}
+                                               </span>
+                                           </div>
+                                           <div className="text-zenith-muted text-xs font-mono line-clamp-2 border-l-2 border-zenith-border pl-2 group-hover:border-zenith-orange">
+                                               "...{link.context}..."
+                                           </div>
+                                       </div>
+                                   ))}
+                               </div>
+                           </div>
+                       )}
                    </div>
                    {/* Bottom Spacer for comfortable reading */}
                    <div className="h-32"></div>
@@ -397,6 +510,13 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
         onConfirm={handleDeleteConfirm}
         title="Delete File"
         itemName={file.name}
+      />
+      
+      <LinkSelectorModal
+        isOpen={isLinkSelectorOpen}
+        onClose={() => setIsLinkSelectorOpen(false)}
+        repos={repos}
+        onSelect={handleLinkSelect}
       />
     </div>
   );

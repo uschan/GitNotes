@@ -38,7 +38,8 @@ import {
   Github,
   Instagram,
   Twitter,
-  Globe
+  Globe,
+  RefreshCw
 } from 'lucide-react';
 
 export const Icons = {
@@ -80,5 +81,6 @@ export const Icons = {
   Github,
   Instagram,
   Twitter,
-  Globe
+  Globe,
+  RefreshCw
 };

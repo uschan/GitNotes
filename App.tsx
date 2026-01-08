@@ -44,6 +44,11 @@ function App() {
       setRepos([]);
   };
 
+  // Explicit Sync Action for Button
+  const handleSync = () => {
+      if (secretKey) loadData(secretKey);
+  };
+
   // Global Key Listener for Search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -153,6 +158,7 @@ function App() {
                     repos={repos} 
                     onCreateRepo={handleCreateRepo} 
                     onQuickSave={handleQuickSave}
+                    onSync={handleSync}
                     isLoading={loading}
                 />
             } 
@@ -186,11 +192,11 @@ function App() {
             <SocialBar />
             
             <div className="text-[10px] tracking-widest text-zenith-muted font-mono uppercase flex items-center gap-4 opacity-60 hover:opacity-100 transition-opacity">
-                <span className="text-zenith-green">Secure Link Established</span>
+                <span className="text-zenith-green">Produced by WildSalt.Lab</span>
                 <span className="w-px h-3 bg-zenith-muted"></span>
                 <button onClick={() => setIsSearchOpen(true)} className="hover:text-white flex items-center gap-1"><Icons.Command size={10}/> CMD+K</button>
                 <span className="w-px h-3 bg-zenith-muted"></span>
-                <span className="">Ver: 3.0.0</span>
+                <span className="">Ver: 3.1.0</span>
             </div>
         </footer>
         

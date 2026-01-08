@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useNavigate } from 'react-router-dom';
 
 interface MarkdownPreviewProps {
   content: string;
@@ -25,6 +26,8 @@ const getNodeText = (node: any): string => {
 };
 
 const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content }) => {
+  const navigate = useNavigate();
+
   // Simple Frontmatter Parser
   let displayContent = content;
   let frontmatter: Record<string, string> | null = null;
@@ -116,7 +119,22 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content }) => {
             li: ({node, ...props}) => <li className="pl-1" {...props} />,
 
             // Links & Formatting
-            a: ({node, ...props}) => <a className="text-zenith-orange hover:text-white underline decoration-zenith-orange/50 hover:decoration-white underline-offset-4 transition-colors cursor-pointer" {...props} />,
+            a: ({node, href, ...props}) => {
+                const isInternal = href && href.startsWith('/');
+                return (
+                    <a 
+                        className="text-zenith-orange hover:text-white underline decoration-zenith-orange/50 hover:decoration-white underline-offset-4 transition-colors cursor-pointer" 
+                        href={href}
+                        onClick={(e) => {
+                            if (isInternal) {
+                                e.preventDefault();
+                                navigate(href);
+                            }
+                        }}
+                        {...props} 
+                    />
+                );
+            },
             hr: ({node, ...props}) => <hr className="border-zenith-border my-8" {...props} />,
             img: ({node, ...props}) => <img className="max-w-full border border-zenith-border my-6 bg-black/50" {...props} />,
             strong: ({node, ...props}) => <strong className="font-bold text-white" {...props} />,

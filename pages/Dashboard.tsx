@@ -3,15 +3,17 @@ import { Repository } from '../types';
 import { Icons } from '../components/Icon';
 import { Link } from 'react-router-dom';
 import QuickCapture from '../components/QuickCapture';
+import ContributionGraph from '../components/ContributionGraph';
 
 interface DashboardProps {
   repos: Repository[];
   onCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<string | null>;
   onQuickSave: (repoId: string, title: string, content: string) => Promise<void>;
+  onSync: () => void;
   isLoading: boolean;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ repos, onCreateRepo, onQuickSave, isLoading }) => {
+const Dashboard: React.FC<DashboardProps> = ({ repos, onCreateRepo, onQuickSave, onSync, isLoading }) => {
   const [showNewRepoModal, setShowNewRepoModal] = useState(false);
   const [newRepoName, setNewRepoName] = useState('');
   const [newRepoDesc, setNewRepoDesc] = useState('');
@@ -40,64 +42,80 @@ const Dashboard: React.FC<DashboardProps> = ({ repos, onCreateRepo, onQuickSave,
       />
 
       {/* Control Panel Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 border-b border-zenith-border pb-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-zenith-border pb-6">
         <div>
            <div className="font-mono text-[10px] tracking-widest text-zenith-orange mb-2">SECTOR: REPOSITORIES</div>
            <h1 className="text-4xl md:text-5xl font-bold tracking-tighter text-white">DATA MODULES</h1>
         </div>
         
-        <button 
-          onClick={() => setShowNewRepoModal(true)}
-          className="bg-zenith-surface border border-zenith-border hover:bg-white hover:text-black text-white px-6 py-3 text-xs font-mono tracking-widest uppercase transition-colors duration-75 flex items-center gap-2 group"
-        >
-          <Icons.Plus size={14} />
-          <span>Initialize New Module</span>
-        </button>
+        <div className="flex items-center gap-4">
+            <button 
+              onClick={onSync}
+              className="bg-zenith-surface border border-zenith-border text-zenith-muted hover:text-white px-4 py-3 text-xs font-mono tracking-widest uppercase transition-colors duration-75 flex items-center gap-2 group"
+              title="Sync with Database"
+            >
+              <Icons.RefreshCw size={14} className={isLoading ? "animate-spin text-zenith-orange" : "group-hover:text-zenith-orange"} />
+              <span className="hidden sm:inline">Sync</span>
+            </button>
+
+            <button 
+              onClick={() => setShowNewRepoModal(true)}
+              className="bg-zenith-surface border border-zenith-border hover:bg-white hover:text-black text-white px-6 py-3 text-xs font-mono tracking-widest uppercase transition-colors duration-75 flex items-center gap-2 group"
+            >
+              <Icons.Plus size={14} />
+              <span>Initialize New Module</span>
+            </button>
+        </div>
       </div>
 
-      {isLoading ? (
+      {isLoading && repos.length === 0 ? (
         <div className="text-center py-20 font-mono text-zenith-orange animate-pulse">ESTABLISHING DATABASE CONNECTION...</div>
       ) : (
-          /* Grid Layout */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {repos.map(repo => (
-              <Link 
-                key={repo.id} 
-                to={`/${repo.id}`}
-                className="group relative bg-zenith-surface border border-zenith-border p-8 min-h-[240px] flex flex-col justify-between hover:border-zenith-orange transition-colors duration-75 overflow-hidden"
-              >
-                {/* Decorative Corner Marks */}
-                <div className="absolute top-0 left-0 w-2 h-2 border-l border-t border-zenith-light group-hover:border-zenith-orange"></div>
-                <div className="absolute top-0 right-0 w-2 h-2 border-r border-t border-zenith-light group-hover:border-zenith-orange"></div>
-                <div className="absolute bottom-0 left-0 w-2 h-2 border-l border-b border-zenith-light group-hover:border-zenith-orange"></div>
-                <div className="absolute bottom-0 right-0 w-2 h-2 border-r border-b border-zenith-light group-hover:border-zenith-orange"></div>
+          <div className="space-y-8">
+            {/* Contribution Graph */}
+            <ContributionGraph repos={repos} />
 
-                <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
+            {/* Grid Layout */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {repos.map(repo => (
+                <Link 
+                    key={repo.id} 
+                    to={`/${repo.id}`}
+                    className="group relative bg-zenith-surface border border-zenith-border p-8 min-h-[240px] flex flex-col justify-between hover:border-zenith-orange transition-colors duration-75 overflow-hidden"
+                >
+                    {/* Decorative Corner Marks */}
+                    <div className="absolute top-0 left-0 w-2 h-2 border-l border-t border-zenith-light group-hover:border-zenith-orange"></div>
+                    <div className="absolute top-0 right-0 w-2 h-2 border-r border-t border-zenith-light group-hover:border-zenith-orange"></div>
+                    <div className="absolute bottom-0 left-0 w-2 h-2 border-l border-b border-zenith-light group-hover:border-zenith-orange"></div>
+                    <div className="absolute bottom-0 right-0 w-2 h-2 border-r border-b border-zenith-light group-hover:border-zenith-orange"></div>
 
-                <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-4">
-                        <span className="font-mono text-[10px] tracking-widest text-zenith-muted uppercase truncate max-w-[150px]">ID: {repo.id.slice(0,8)}</span>
-                        <Icons.GitBranch size={14} className="text-zenith-muted group-hover:text-zenith-orange" />
+                    <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
+
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                            <span className="font-mono text-[10px] tracking-widest text-zenith-muted uppercase truncate max-w-[150px]">ID: {repo.id.slice(0,8)}</span>
+                            <Icons.GitBranch size={14} className="text-zenith-muted group-hover:text-zenith-orange" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-white tracking-tight mb-2 group-hover:text-zenith-orange">{repo.name}</h3>
+                        <p className="text-zenith-muted text-sm leading-relaxed line-clamp-2 font-mono">{repo.description || "NO DESCRIPTION DATA"}</p>
                     </div>
-                    <h3 className="text-2xl font-bold text-white tracking-tight mb-2 group-hover:text-zenith-orange">{repo.name}</h3>
-                    <p className="text-zenith-muted text-sm leading-relaxed line-clamp-2 font-mono">{repo.description || "NO DESCRIPTION DATA"}</p>
-                </div>
 
-                <div className="relative z-10 flex items-center justify-between border-t border-zenith-border pt-4 mt-4">
-                    <div className="font-mono text-[10px] tracking-widest text-zenith-muted">
-                        {new Date(repo.updatedAt).toLocaleDateString().toUpperCase()}
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <span className="text-[10px] bg-zenith-border text-white px-2 py-0.5 font-mono flex items-center gap-1">
-                            <Icons.File size={10} /> {repo.files.length}
-                        </span>
-                        <div className="text-[10px] bg-zenith-border text-white px-2 py-0.5 font-mono">
-                            {repo.language.toUpperCase()}
+                    <div className="relative z-10 flex items-center justify-between border-t border-zenith-border pt-4 mt-4">
+                        <div className="font-mono text-[10px] tracking-widest text-zenith-muted">
+                            {new Date(repo.updatedAt).toLocaleDateString().toUpperCase()}
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="text-[10px] bg-zenith-border text-white px-2 py-0.5 font-mono flex items-center gap-1">
+                                <Icons.File size={10} /> {repo.files.length}
+                            </span>
+                            <div className="text-[10px] bg-zenith-border text-white px-2 py-0.5 font-mono">
+                                {repo.language.toUpperCase()}
+                            </div>
                         </div>
                     </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+                ))}
+            </div>
           </div>
       )}
 

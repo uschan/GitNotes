@@ -3,9 +3,10 @@ import { Icons } from './Icon';
 
 interface EditorToolbarProps {
   onInsert: (prefix: string, suffix?: string) => void;
+  onLinkNote?: () => void;
 }
 
-const EditorToolbar: React.FC<EditorToolbarProps> = ({ onInsert }) => {
+const EditorToolbar: React.FC<EditorToolbarProps> = ({ onInsert, onLinkNote }) => {
   const tools = [
     { icon: Icons.Bold, label: 'Bold', action: () => onInsert('**', '**') },
     { icon: Icons.Italic, label: 'Italic', action: () => onInsert('*', '*') },
@@ -13,7 +14,8 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({ onInsert }) => {
     { icon: Icons.Quote, label: 'Quote', action: () => onInsert('> ') },
     { icon: Icons.List, label: 'List', action: () => onInsert('- ') },
     { icon: Icons.Code, label: 'Code', action: () => onInsert('```\n', '\n```') },
-    { icon: Icons.Link, label: 'Link', action: () => onInsert('[', '](url)') },
+    { icon: Icons.Link, label: 'Link URL', action: () => onInsert('[', '](url)') },
+    { icon: Icons.File, label: 'Link Note', action: () => onLinkNote && onLinkNote() }, // New Button
     { icon: Icons.Check, label: 'Task', action: () => onInsert('- [ ] ') },
   ];
 
