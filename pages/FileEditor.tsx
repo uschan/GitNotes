@@ -6,8 +6,8 @@ import MarkdownPreview from '../components/MarkdownPreview';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import EditorToolbar from '../components/EditorToolbar';
 import TurndownService from 'turndown';
-// @ts-ignore
-import { gfm } from 'turndown-plugin-gfm';
+// Use namespace import to handle potential CommonJS/ESM interop issues with Vite
+import * as TurndownPluginGfm from 'turndown-plugin-gfm';
 
 interface FileEditorProps {
   repos: Repository[];
@@ -35,8 +35,6 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
   useEffect(() => {
     if (file) {
       setContent(file.content);
-      // Auto-switch to preview mode for visitors, write for admin if desired, 
-      // but 'preview' is a safe default for reading.
     }
   }, [file]);
 
@@ -83,20 +81,43 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
     }, 0);
   };
 
+  const insertTextAtCursor = (textToInsert: string) => {
+      if (!textAreaRef.current) return;
+      const start = textAreaRef.current.selectionStart;
+      const end = textAreaRef.current.selectionEnd;
+      const currentText = textAreaRef.current.value;
+      const before = currentText.substring(0, start);
+      const after = currentText.substring(end);
+      
+      const newText = before + textToInsert + after;
+      handleContentChange(newText);
+      
+      setTimeout(() => {
+          if (textAreaRef.current) {
+              textAreaRef.current.focus();
+              const newCursorPos = start + textToInsert.length;
+              textAreaRef.current.selectionStart = newCursorPos;
+              textAreaRef.current.selectionEnd = newCursorPos;
+          }
+      }, 0);
+  };
+
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    // Only intervene if authenticated and we have HTML content
     if (!isAuthenticated) return;
 
     const clipboardData = e.clipboardData;
     const types = clipboardData.types;
+    
+    console.log("Paste detected. Types:", types);
 
-    // Check if HTML exists in clipboard
+    // Check for HTML content
     if (types.includes('text/html')) {
         const html = clipboardData.getData('text/html');
         
-        // Basic check to see if it's worth converting (contains tags)
+        // Basic check: Does it look like HTML? (tags)
         if (/<[a-z][\s\S]*>/i.test(html)) {
-            e.preventDefault();
+            console.log("HTML content detected, attempting conversion...");
+            e.preventDefault(); // Stop default plain text paste
             
             try {
                 const turndownService = new TurndownService({
@@ -106,81 +127,66 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                     emDelimiter: '*'
                 });
                 
-                // Add GFM plugin (tables, strikethrough, etc)
-                turndownService.use(gfm);
+                // Safely load GFM plugin
+                // @ts-ignore
+                const gfmPlugin = TurndownPluginGfm.gfm || TurndownPluginGfm.default?.gfm;
+                if (gfmPlugin) {
+                    turndownService.use(gfmPlugin);
+                } else {
+                    console.warn("Turndown GFM plugin not found, using basic conversion.");
+                }
 
-                // Custom rules if needed, e.g., to handle pre tags better
+                // Custom rule for pre tags to ensure code blocks work well
                 turndownService.addRule('pre', {
                     filter: ['pre'],
                     replacement: function (content, node) {
-                        return '```\n' + node.textContent + '\n```';
+                         return '\n```\n' + node.textContent + '\n```\n';
                     }
                 });
 
                 const markdown = turndownService.turndown(html);
                 
-                // Show status feedback
-                setConversionStatus("DETECTED RICH TEXT: AUTO-CONVERTING TO MARKDOWN...");
+                // Visual Feedback
+                setConversionStatus("RICH TEXT CONVERTED");
                 setTimeout(() => setConversionStatus(null), 3000);
 
-                // Insert the converted markdown
-                if (!textAreaRef.current) return;
-                const start = textAreaRef.current.selectionStart;
-                const end = textAreaRef.current.selectionEnd;
-                const text = textAreaRef.current.value;
-                const before = text.substring(0, start);
-                const after = text.substring(end);
-                
-                const newText = before + markdown + after;
-                handleContentChange(newText);
-                
-                // Update cursor
-                setTimeout(() => {
-                    if (textAreaRef.current) {
-                        textAreaRef.current.focus();
-                        const newCursorPos = start + markdown.length;
-                        textAreaRef.current.selectionStart = newCursorPos;
-                        textAreaRef.current.selectionEnd = newCursorPos;
-                    }
-                }, 0);
+                insertTextAtCursor(markdown);
 
             } catch (err) {
-                console.error("Paste conversion failed", err);
-                // Fallback to default paste if conversion errors
-                // We do nothing here, let the event propagate? 
-                // Since we called preventDefault, we must manually insert plain text if it fails, 
-                // but usually preventDefault is called early. 
-                // For safety, if error, we might just insert plain text.
+                console.error("Paste conversion failed:", err);
+                // Fallback: manually insert the plain text since we prevented default
                 const plainText = clipboardData.getData('text/plain');
-                if (!textAreaRef.current) return;
-                 const start = textAreaRef.current.selectionStart;
-                const end = textAreaRef.current.selectionEnd;
-                const text = textAreaRef.current.value;
-                const before = text.substring(0, start);
-                const after = text.substring(end);
-                handleContentChange(before + plainText + after);
+                insertTextAtCursor(plainText);
+                
+                setConversionStatus("CONVERSION FAILED - PASTED PLAIN TEXT");
+                setTimeout(() => setConversionStatus(null), 3000);
             }
         }
     }
+    // If not HTML, let default behavior happen (plain text paste)
   };
 
   const lineCount = content.split('\n').length;
 
   return (
-    <div className="h-[calc(100vh-56px)] flex flex-col bg-zenith-bg">
+    <div className="h-[calc(100vh-56px)] flex flex-col bg-zenith-bg relative">
       
-      {/* File Toolbar */}
-      <div className="h-14 border-b border-zenith-border bg-zenith-bg flex items-center justify-between px-6 shrink-0 relative">
-          
-          {/* Status Overlay for Paste */}
-          {conversionStatus && (
-              <div className="absolute inset-0 bg-zenith-orange/90 flex items-center justify-center z-20 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <span className="font-mono text-black font-bold text-xs tracking-widest flex items-center gap-2">
-                      <Icons.Zap size={14} /> {conversionStatus}
+      {/* Toast Notification (Fixed Position) */}
+      {conversionStatus && (
+          <div className="fixed bottom-12 right-6 z-50 animate-in slide-in-from-bottom-5 duration-300">
+              <div className="bg-zenith-surface border border-zenith-orange px-4 py-3 shadow-[0_0_15px_rgba(255,77,0,0.2)] flex items-center gap-3">
+                  <div className="bg-zenith-orange text-black p-1">
+                      <Icons.Zap size={14} />
+                  </div>
+                  <span className="font-mono text-white font-bold text-xs tracking-widest uppercase">
+                      {conversionStatus}
                   </span>
               </div>
-          )}
+          </div>
+      )}
 
+      {/* File Toolbar */}
+      <div className="h-14 border-b border-zenith-border bg-zenith-bg flex items-center justify-between px-6 shrink-0 relative z-10">
           <div className="flex items-center gap-4">
               <Link to={`/${repoId}`} className="text-zenith-muted hover:text-white transition-colors">
                   <Icons.ChevronRight className="rotate-180" size={18} />
@@ -236,7 +242,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-hidden relative flex">
+      <div className="flex-1 overflow-hidden relative flex z-0">
          
          {/* Write Panel */}
          {(viewMode === 'write' || viewMode === 'split') && (
@@ -256,7 +262,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                     onPaste={handlePaste}
                     className={`w-full h-full bg-zenith-bg text-zenith-text font-mono text-sm p-4 resize-none outline-none transition-colors leading-relaxed ${!isAuthenticated ? 'cursor-not-allowed text-zenith-muted' : 'focus:bg-[#050505]'}`}
                     spellCheck={false}
-                    placeholder={!isAuthenticated ? "Editing is disabled in visitor mode." : "Start typing... (Paste rich text to auto-convert to Markdown)"}
+                    placeholder={!isAuthenticated ? "Editing is disabled in visitor mode." : "Start typing... (Rich text pasted here will be auto-converted to Markdown)"}
                 />
              </div>
            </div>
@@ -274,7 +280,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
       </div>
       
       {/* Footer Info */}
-      <div className="h-8 border-t border-zenith-border bg-zenith-surface flex items-center justify-between px-4 font-mono text-[10px] text-zenith-muted uppercase tracking-widest">
+      <div className="h-8 border-t border-zenith-border bg-zenith-surface flex items-center justify-between px-4 font-mono text-[10px] text-zenith-muted uppercase tracking-widest shrink-0">
          <div>Ln {lineCount}, Col {content.length}</div>
          <div>{isAuthenticated ? 'Markdown Environment' : 'Visitor View'}</div>
       </div>
