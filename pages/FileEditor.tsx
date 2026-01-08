@@ -6,6 +6,7 @@ import MarkdownPreview from '../components/MarkdownPreview';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import EditorToolbar from '../components/EditorToolbar';
 import TurndownService from 'turndown';
+// @ts-ignore
 import { gfm } from 'turndown-plugin-gfm';
 
 interface FileEditorProps {
