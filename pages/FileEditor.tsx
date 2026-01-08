@@ -6,8 +6,9 @@ import MarkdownPreview from '../components/MarkdownPreview';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import EditorToolbar from '../components/EditorToolbar';
 import TurndownService from 'turndown';
+// Use wildcard import to handle both ESM (CDN) and CJS (Node) structures
 // @ts-ignore
-import { gfm } from 'turndown-plugin-gfm';
+import * as TurndownPluginGfmModule from 'turndown-plugin-gfm';
 
 interface FileEditorProps {
   repos: Repository[];
@@ -108,16 +109,19 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
     const clipboardData = e.clipboardData;
     const types = clipboardData.types;
     
-    console.log("Paste detected. Types:", types);
+    console.log("GitNotes Paste Debug: Available Types ->", types);
 
     // Check for HTML content
     if (types.includes('text/html')) {
         const html = clipboardData.getData('text/html');
+        console.log("GitNotes Paste Debug: Raw HTML length ->", html.length);
         
-        // Basic check: Does it look like HTML? (tags)
-        // We use a simple regex to detect HTML tags.
-        if (/<[a-z][\s\S]*>/i.test(html)) {
-            console.log("HTML content detected, attempting conversion...");
+        // Relaxed check: Look for common HTML tags (p, div, br, span, h1-h6, ul, ol, li, table)
+        // OR checks if it starts with < and ends with > (rough check)
+        const hasTags = /<(p|div|br|span|h[1-6]|ul|ol|li|table|a|b|i|strong|em|code|pre)/i.test(html);
+        
+        if (hasTags) {
+            console.log("GitNotes Paste Debug: HTML tags detected, starting Turndown...");
             e.preventDefault(); // Stop default plain text paste
             
             try {
@@ -128,9 +132,20 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                     emDelimiter: '*'
                 });
                 
-                // Use the imported gfm plugin
-                if (gfm) {
-                    turndownService.use(gfm);
+                // Defensive plugin loading to handle both ESM and CJS structures
+                // @ts-ignore
+                const gfmPlugin = TurndownPluginGfmModule.gfm || TurndownPluginGfmModule.default?.gfm || TurndownPluginGfmModule.default || TurndownPluginGfmModule;
+                
+                // Verify if what we got is actually a function (plugins are functions in Turndown)
+                if (typeof gfmPlugin === 'function') {
+                    try {
+                         turndownService.use(gfmPlugin);
+                         console.log("GitNotes Debug: GFM Plugin loaded successfully");
+                    } catch (pluginError) {
+                         console.warn("GitNotes Warning: Failed to apply GFM plugin", pluginError);
+                    }
+                } else {
+                    console.warn("GitNotes Warning: GFM plugin not found or invalid format", gfmPlugin);
                 }
 
                 // Custom rule for pre tags to ensure code blocks work well
@@ -142,6 +157,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                 });
 
                 const markdown = turndownService.turndown(html);
+                console.log("GitNotes Paste Debug: Conversion success. Length ->", markdown.length);
                 
                 // Visual Feedback
                 setConversionStatus("RICH TEXT CONVERTED");
@@ -150,7 +166,8 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                 insertTextAtCursor(markdown);
 
             } catch (err) {
-                console.error("Paste conversion failed:", err);
+                console.error("GitNotes Error: Paste conversion critical failure:", err);
+                
                 // Fallback: manually insert the plain text since we prevented default
                 const plainText = clipboardData.getData('text/plain');
                 insertTextAtCursor(plainText);
@@ -158,9 +175,12 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                 setConversionStatus("CONVERSION FAILED - PASTED PLAIN TEXT");
                 setTimeout(() => setConversionStatus(null), 3000);
             }
+            return;
         }
     }
-    // If not HTML, let default behavior happen (plain text paste)
+    
+    // If we get here, it's just plain text or the HTML check failed
+    console.log("GitNotes Paste Debug: Treating as plain text");
   };
 
   const lineCount = content.split('\n').length;
