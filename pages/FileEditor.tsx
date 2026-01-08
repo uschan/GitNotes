@@ -5,6 +5,8 @@ import { Icons } from '../components/Icon';
 import MarkdownPreview from '../components/MarkdownPreview';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import EditorToolbar from '../components/EditorToolbar';
+import TurndownService from 'turndown';
+import { gfm } from 'turndown-plugin-gfm';
 
 interface FileEditorProps {
   repos: Repository[];
@@ -27,6 +29,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
   const [content, setContent] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [conversionStatus, setConversionStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (file) {
@@ -79,13 +82,104 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
     }, 0);
   };
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    // Only intervene if authenticated and we have HTML content
+    if (!isAuthenticated) return;
+
+    const clipboardData = e.clipboardData;
+    const types = clipboardData.types;
+
+    // Check if HTML exists in clipboard
+    if (types.includes('text/html')) {
+        const html = clipboardData.getData('text/html');
+        
+        // Basic check to see if it's worth converting (contains tags)
+        if (/<[a-z][\s\S]*>/i.test(html)) {
+            e.preventDefault();
+            
+            try {
+                const turndownService = new TurndownService({
+                    headingStyle: 'atx',
+                    codeBlockStyle: 'fenced',
+                    bulletListMarker: '-',
+                    emDelimiter: '*'
+                });
+                
+                // Add GFM plugin (tables, strikethrough, etc)
+                turndownService.use(gfm);
+
+                // Custom rules if needed, e.g., to handle pre tags better
+                turndownService.addRule('pre', {
+                    filter: ['pre'],
+                    replacement: function (content, node) {
+                        return '```\n' + node.textContent + '\n```';
+                    }
+                });
+
+                const markdown = turndownService.turndown(html);
+                
+                // Show status feedback
+                setConversionStatus("DETECTED RICH TEXT: AUTO-CONVERTING TO MARKDOWN...");
+                setTimeout(() => setConversionStatus(null), 3000);
+
+                // Insert the converted markdown
+                if (!textAreaRef.current) return;
+                const start = textAreaRef.current.selectionStart;
+                const end = textAreaRef.current.selectionEnd;
+                const text = textAreaRef.current.value;
+                const before = text.substring(0, start);
+                const after = text.substring(end);
+                
+                const newText = before + markdown + after;
+                handleContentChange(newText);
+                
+                // Update cursor
+                setTimeout(() => {
+                    if (textAreaRef.current) {
+                        textAreaRef.current.focus();
+                        const newCursorPos = start + markdown.length;
+                        textAreaRef.current.selectionStart = newCursorPos;
+                        textAreaRef.current.selectionEnd = newCursorPos;
+                    }
+                }, 0);
+
+            } catch (err) {
+                console.error("Paste conversion failed", err);
+                // Fallback to default paste if conversion errors
+                // We do nothing here, let the event propagate? 
+                // Since we called preventDefault, we must manually insert plain text if it fails, 
+                // but usually preventDefault is called early. 
+                // For safety, if error, we might just insert plain text.
+                const plainText = clipboardData.getData('text/plain');
+                if (!textAreaRef.current) return;
+                 const start = textAreaRef.current.selectionStart;
+                const end = textAreaRef.current.selectionEnd;
+                const text = textAreaRef.current.value;
+                const before = text.substring(0, start);
+                const after = text.substring(end);
+                handleContentChange(before + plainText + after);
+            }
+        }
+    }
+  };
+
   const lineCount = content.split('\n').length;
 
   return (
     <div className="h-[calc(100vh-56px)] flex flex-col bg-zenith-bg">
       
       {/* File Toolbar */}
-      <div className="h-14 border-b border-zenith-border bg-zenith-bg flex items-center justify-between px-6 shrink-0">
+      <div className="h-14 border-b border-zenith-border bg-zenith-bg flex items-center justify-between px-6 shrink-0 relative">
+          
+          {/* Status Overlay for Paste */}
+          {conversionStatus && (
+              <div className="absolute inset-0 bg-zenith-orange/90 flex items-center justify-center z-20 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <span className="font-mono text-black font-bold text-xs tracking-widest flex items-center gap-2">
+                      <Icons.Zap size={14} /> {conversionStatus}
+                  </span>
+              </div>
+          )}
+
           <div className="flex items-center gap-4">
               <Link to={`/${repoId}`} className="text-zenith-muted hover:text-white transition-colors">
                   <Icons.ChevronRight className="rotate-180" size={18} />
@@ -158,9 +252,10 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                     readOnly={!isAuthenticated}
                     value={content}
                     onChange={(e) => handleContentChange(e.target.value)}
+                    onPaste={handlePaste}
                     className={`w-full h-full bg-zenith-bg text-zenith-text font-mono text-sm p-4 resize-none outline-none transition-colors leading-relaxed ${!isAuthenticated ? 'cursor-not-allowed text-zenith-muted' : 'focus:bg-[#050505]'}`}
                     spellCheck={false}
-                    placeholder={!isAuthenticated ? "Editing is disabled in visitor mode." : "Start typing..."}
+                    placeholder={!isAuthenticated ? "Editing is disabled in visitor mode." : "Start typing... (Paste rich text to auto-convert to Markdown)"}
                 />
              </div>
            </div>
