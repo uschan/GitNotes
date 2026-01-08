@@ -5,9 +5,9 @@ import { Icons } from '../components/Icon';
 import MarkdownPreview from '../components/MarkdownPreview';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import EditorToolbar from '../components/EditorToolbar';
-// Import Turndown generically to handle both CJS and ESM environments in Vite
+// Use default import for Turndown, but handle 'default' property at runtime if needed
 // @ts-ignore
-import * as TurndownServiceModule from 'turndown';
+import TurndownService from 'turndown';
 // Use named import for gfm plugin
 // @ts-ignore
 import { gfm } from 'turndown-plugin-gfm';
@@ -111,80 +111,81 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
     const clipboardData = e.clipboardData;
     const types = clipboardData.types;
     
-    console.log("GitNotes Paste Debug: Available Types ->", types);
+    // console.log("GitNotes Paste Debug: Available Types ->", types);
 
-    // Check for HTML content presence regardless of tags (to catch edge cases)
+    // Check for HTML content
     if (types.includes('text/html')) {
         const html = clipboardData.getData('text/html');
-        console.log("GitNotes Paste Debug: HTML content found. Length:", html.length);
-        console.log("GitNotes Paste Debug: HTML snippet:", html.substring(0, 100));
-        
-        // We will attempt conversion whenever HTML is present, skipping the regex check
-        // because sometimes simple bold/italic text or code blocks won't have complex tags structure
-        // that matches a strict regex.
+        // console.log("GitNotes Paste Debug: Found HTML content, length:", html.length);
         
         try {
-            console.log("GitNotes Paste Debug: Attempting Turndown conversion...");
-            e.preventDefault(); // Stop default plain text paste immediately
+            e.preventDefault(); // Prevent default plain text paste immediately
 
-            // Robustly resolve the Turndown constructor
-            // Vite/Rollup can sometimes bundle CJS modules as `default` export or flat exports.
+            // 1. Robust Constructor Resolution
+            // In Vite prod builds, sometimes CJS modules are wrapped in { default: ... }
+            let ServiceClass = TurndownService;
             // @ts-ignore
-            const TurndownService = TurndownServiceModule.default || TurndownServiceModule;
-            
-            if (typeof TurndownService !== 'function') {
-                throw new Error(`TurndownService is not a constructor. It is type: ${typeof TurndownService}`);
+            if (typeof ServiceClass !== 'function' && ServiceClass.default) {
+                // @ts-ignore
+                ServiceClass = ServiceClass.default;
             }
 
-            const turndownService = new TurndownService({
+            if (typeof ServiceClass !== 'function') {
+                throw new Error("Could not find TurndownService constructor.");
+            }
+
+            // 2. Initialize Service
+            // @ts-ignore
+            const turndownService = new ServiceClass({
                 headingStyle: 'atx',
                 codeBlockStyle: 'fenced',
                 bulletListMarker: '-',
                 emDelimiter: '*'
             });
-            
-            // Apply GFM plugin if available
-            if (typeof gfm === 'function') {
-                 try {
-                     turndownService.use(gfm);
-                 } catch (pluginError) {
-                     console.warn("GitNotes Warning: Failed to apply GFM plugin", pluginError);
-                 }
-            } else {
-                console.warn("GitNotes Warning: GFM plugin is not a function:", gfm);
+
+            // 3. Robust Plugin Loading (Fail-safe)
+            try {
+                if (typeof gfm === 'function') {
+                    turndownService.use(gfm);
+                    // console.log("GitNotes Debug: GFM Plugin applied.");
+                } else {
+                    console.warn("GitNotes Warning: GFM plugin not available, skipping tables support.");
+                }
+            } catch (pluginErr) {
+                console.warn("GitNotes Warning: Error applying GFM plugin, continuing with basic markdown.", pluginErr);
             }
 
-            // Custom rule for pre tags to ensure code blocks work well
+            // 4. Custom Rules
             turndownService.addRule('pre', {
                 filter: ['pre'],
-                replacement: function (content, node) {
+                replacement: function (content: string, node: any) {
                      return '\n```\n' + node.textContent + '\n```\n';
                 }
             });
 
+            // 5. Execute Conversion
             const markdown = turndownService.turndown(html);
-            console.log("GitNotes Paste Debug: Conversion success. MD Length:", markdown.length);
             
             // Visual Feedback
-            setConversionStatus("RICH TEXT CONVERTED");
+            setConversionStatus("SMART PASTE: MARKDOWN");
             setTimeout(() => setConversionStatus(null), 3000);
 
             insertTextAtCursor(markdown);
 
         } catch (err) {
-            console.error("GitNotes Error: Paste conversion failed:", err);
+            console.error("GitNotes Paste Error:", err);
             
-            // Fallback: insert the plain text
+            // Fallback: manually insert the plain text since we prevented default
             const plainText = clipboardData.getData('text/plain');
             insertTextAtCursor(plainText);
             
-            setConversionStatus("CONVERSION FAILED - PLAIN TEXT");
+            setConversionStatus("PASTE FALLBACK: PLAIN TEXT");
             setTimeout(() => setConversionStatus(null), 3000);
         }
         return;
     }
     
-    console.log("GitNotes Paste Debug: No HTML type found, default paste.");
+    // console.log("GitNotes Paste: Plain text mode");
   };
 
   const lineCount = content.split('\n').length;
