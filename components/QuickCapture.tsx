@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Icons } from './Icon';
 import { Repository } from '../types';
 // @ts-ignore
@@ -23,6 +23,16 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
   const [conversionStatus, setConversionStatus] = useState<string | null>(null);
   
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize logic
+  useEffect(() => {
+    if (textAreaRef.current && isExpanded) {
+        // Reset height to auto to correctly calculate shrink
+        textAreaRef.current.style.height = 'auto';
+        // Set to scrollHeight
+        textAreaRef.current.style.height = `${textAreaRef.current.scrollHeight}px`;
+    }
+  }, [content, isExpanded]);
 
   const handleSave = async () => {
     if (!content.trim()) return;
@@ -123,7 +133,8 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
                 headingStyle: 'atx',
                 codeBlockStyle: 'fenced',
                 bulletListMarker: '-',
-                emDelimiter: '*'
+                emDelimiter: '*',
+                hr: '***' // Use asterisks for HR to avoid conflict with Frontmatter '---'
             });
 
             // Try to use GFM plugin
@@ -137,13 +148,21 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
 
             // Pure Text Mode: Remove images
             turndownService.remove('img');
-            turndownService.remove('picture'); // Also remove picture tags often used for responsive images
+            turndownService.remove('picture'); 
 
             // Custom rule for pre tags
             turndownService.addRule('pre', {
                 filter: ['pre'],
                 replacement: function (content: string, node: any) {
                      return '\n```\n' + node.textContent + '\n```\n';
+                }
+            });
+
+            // Force HR rule to be asterisks
+            turndownService.addRule('horizontalRule', {
+                filter: 'hr',
+                replacement: function () {
+                    return '\n\n***\n\n';
                 }
             });
 
@@ -217,7 +236,8 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
                     onChange={e => setContent(e.target.value)}
                     onPaste={handlePaste}
                     placeholder="Enter raw data stream... (Auto-converts to clean Markdown, images removed)"
-                    className="w-full bg-black border border-zenith-border p-4 text-white font-mono text-sm focus:border-zenith-orange focus:outline-none min-h-[120px] resize-y"
+                    className="w-full bg-black border border-zenith-border p-4 text-white font-mono text-sm focus:border-zenith-orange focus:outline-none min-h-[120px] max-h-[60vh] overflow-hidden resize-none"
+                    style={{ height: 'auto' }}
                 />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

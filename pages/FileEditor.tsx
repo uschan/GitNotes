@@ -52,14 +52,8 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
     if (!content) return [];
     
     // Regex to match # Heading, ## Heading etc.
-    // Handles simple markdown headers
     const headingRegex = /^(#{1,3})\s+(.+)$/gm;
     const items: TocItem[] = [];
-    let match;
-
-    // We need to work on a version without code blocks to avoid false positives in code
-    // This is a simplified parser; for perfect accuracy one would need AST, but regex is usually fast/enough for basic usage
-    // To respect code blocks, we simple strip lines starting with ``` for the search context, but keeping it simple for now:
     
     const lines = content.split('\n');
     let inCodeBlock = false;
@@ -184,7 +178,8 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                 headingStyle: 'atx',
                 codeBlockStyle: 'fenced',
                 bulletListMarker: '-',
-                emDelimiter: '*'
+                emDelimiter: '*',
+                hr: '***' // Use asterisks to avoid Frontmatter conflicts
             });
 
             // 3. Robust Plugin Loading (Fail-safe)
@@ -207,6 +202,14 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                 filter: ['pre'],
                 replacement: function (content: string, node: any) {
                      return '\n```\n' + node.textContent + '\n```\n';
+                }
+            });
+
+             // Force HR rule to be asterisks here too
+             turndownService.addRule('horizontalRule', {
+                filter: 'hr',
+                replacement: function () {
+                    return '\n\n***\n\n';
                 }
             });
 
