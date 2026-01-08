@@ -6,9 +6,9 @@ import MarkdownPreview from '../components/MarkdownPreview';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import EditorToolbar from '../components/EditorToolbar';
 import TurndownService from 'turndown';
-// Use wildcard import to handle both ESM (CDN) and CJS (Node) structures
+// Standard named import is the correct way for this library in Vite/ESM
 // @ts-ignore
-import * as TurndownPluginGfmModule from 'turndown-plugin-gfm';
+import { gfm } from 'turndown-plugin-gfm';
 
 interface FileEditorProps {
   repos: Repository[];
@@ -116,8 +116,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
         const html = clipboardData.getData('text/html');
         console.log("GitNotes Paste Debug: Raw HTML length ->", html.length);
         
-        // Relaxed check: Look for common HTML tags (p, div, br, span, h1-h6, ul, ol, li, table)
-        // OR checks if it starts with < and ends with > (rough check)
+        // Relaxed check: Look for common HTML tags or simple structure
         const hasTags = /<(p|div|br|span|h[1-6]|ul|ol|li|table|a|b|i|strong|em|code|pre)/i.test(html);
         
         if (hasTags) {
@@ -132,20 +131,16 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                     emDelimiter: '*'
                 });
                 
-                // Defensive plugin loading to handle both ESM and CJS structures
-                // @ts-ignore
-                const gfmPlugin = TurndownPluginGfmModule.gfm || TurndownPluginGfmModule.default?.gfm || TurndownPluginGfmModule.default || TurndownPluginGfmModule;
-                
-                // Verify if what we got is actually a function (plugins are functions in Turndown)
-                if (typeof gfmPlugin === 'function') {
-                    try {
-                         turndownService.use(gfmPlugin);
+                // Use the imported named export
+                if (typeof gfm === 'function') {
+                     try {
+                         turndownService.use(gfm);
                          console.log("GitNotes Debug: GFM Plugin loaded successfully");
-                    } catch (pluginError) {
+                     } catch (pluginError) {
                          console.warn("GitNotes Warning: Failed to apply GFM plugin", pluginError);
-                    }
+                     }
                 } else {
-                    console.warn("GitNotes Warning: GFM plugin not found or invalid format", gfmPlugin);
+                    console.warn("GitNotes Warning: GFM plugin is not a function", gfm);
                 }
 
                 // Custom rule for pre tags to ensure code blocks work well
