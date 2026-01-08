@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Icons } from './Icon';
 import { Repository } from '../types';
+// @ts-ignore
+import TurndownService from 'turndown';
+// @ts-ignore
+import { gfm } from 'turndown-plugin-gfm';
 
 interface QuickCaptureProps {
   repos: Repository[];
@@ -16,6 +20,9 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
   const [isCreatingRepo, setIsCreatingRepo] = useState(false);
   const [newRepoName, setNewRepoName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [conversionStatus, setConversionStatus] = useState<string | null>(null);
+  
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSave = async () => {
     if (!content.trim()) return;
@@ -67,9 +74,110 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
     }
   };
 
-  return (
-    <div className={`mb-12 border transition-all duration-300 ${isExpanded ? 'bg-zenith-surface border-zenith-orange shadow-[0_0_20px_rgba(255,77,0,0.15)]' : 'bg-black border-zenith-border hover:border-zenith-light'}`}>
+  const insertTextAtCursor = (textToInsert: string) => {
+      if (!textAreaRef.current) return;
+      const start = textAreaRef.current.selectionStart;
+      const end = textAreaRef.current.selectionEnd;
+      const currentText = textAreaRef.current.value;
+      const before = currentText.substring(0, start);
+      const after = currentText.substring(end);
       
+      const newText = before + textToInsert + after;
+      setContent(newText);
+      
+      setTimeout(() => {
+          if (textAreaRef.current) {
+              textAreaRef.current.focus();
+              const newCursorPos = start + textToInsert.length;
+              textAreaRef.current.selectionStart = newCursorPos;
+              textAreaRef.current.selectionEnd = newCursorPos;
+          }
+      }, 0);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const clipboardData = e.clipboardData;
+    const types = clipboardData.types;
+
+    if (types.includes('text/html')) {
+        const html = clipboardData.getData('text/html');
+        
+        try {
+            e.preventDefault(); 
+
+            // Robust Constructor Resolution for Vite/Rollup compatibility
+            let ServiceClass = TurndownService;
+            // @ts-ignore
+            if (typeof ServiceClass !== 'function' && ServiceClass.default) {
+                // @ts-ignore
+                ServiceClass = ServiceClass.default;
+            }
+
+            if (typeof ServiceClass !== 'function') {
+                // Fallback if library fails to load, just let default paste happen or insert plain text
+                throw new Error("TurndownService constructor not found");
+            }
+
+            // @ts-ignore
+            const turndownService = new ServiceClass({
+                headingStyle: 'atx',
+                codeBlockStyle: 'fenced',
+                bulletListMarker: '-',
+                emDelimiter: '*'
+            });
+
+            // Try to use GFM plugin
+            try {
+                if (typeof gfm === 'function') {
+                    turndownService.use(gfm);
+                }
+            } catch (e) {
+                console.warn("GFM plugin failed", e);
+            }
+
+            // Custom rule for pre tags
+            turndownService.addRule('pre', {
+                filter: ['pre'],
+                replacement: function (content: string, node: any) {
+                     return '\n```\n' + node.textContent + '\n```\n';
+                }
+            });
+
+            const markdown = turndownService.turndown(html);
+            
+            setConversionStatus("SMART PASTE: MARKDOWN");
+            setTimeout(() => setConversionStatus(null), 3000);
+
+            insertTextAtCursor(markdown);
+
+        } catch (err) {
+            console.error("Paste Error:", err);
+            const plainText = clipboardData.getData('text/plain');
+            insertTextAtCursor(plainText);
+            
+            setConversionStatus("PASTE: PLAIN TEXT");
+            setTimeout(() => setConversionStatus(null), 3000);
+        }
+    }
+  };
+
+  return (
+    <div className={`mb-12 border transition-all duration-300 relative ${isExpanded ? 'bg-zenith-surface border-zenith-orange shadow-[0_0_20px_rgba(255,77,0,0.15)]' : 'bg-black border-zenith-border hover:border-zenith-light'}`}>
+      
+      {/* Toast Notification (Scoped to this component) */}
+      {conversionStatus && (
+          <div className="absolute -top-10 right-0 z-50 animate-in slide-in-from-bottom-2 duration-300">
+              <div className="bg-zenith-surface border border-zenith-orange px-3 py-1.5 shadow-lg flex items-center gap-2">
+                  <div className="bg-zenith-orange text-black p-0.5">
+                      <Icons.Zap size={10} />
+                  </div>
+                  <span className="font-mono text-white font-bold text-[10px] tracking-widest uppercase">
+                      {conversionStatus}
+                  </span>
+              </div>
+          </div>
+      )}
+
       {/* Collapsed View (Input Trigger) */}
       {!isExpanded && (
         <div 
@@ -99,10 +207,12 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
 
             <div className="space-y-4">
                 <textarea 
+                    ref={textAreaRef}
                     autoFocus
                     value={content}
                     onChange={e => setContent(e.target.value)}
-                    placeholder="Enter raw data stream..."
+                    onPaste={handlePaste}
+                    placeholder="Enter raw data stream... (Paste HTML to auto-convert)"
                     className="w-full bg-black border border-zenith-border p-4 text-white font-mono text-sm focus:border-zenith-orange focus:outline-none min-h-[120px] resize-y"
                 />
 
