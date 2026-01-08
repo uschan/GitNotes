@@ -192,7 +192,7 @@ function App() {
             <SocialBar />
             
             <div className="text-[10px] tracking-widest text-zenith-muted font-mono uppercase flex items-center gap-4 opacity-60 hover:opacity-100 transition-opacity">
-                <span className="text-zenith-green">Produced by WildSalt.Lab</span>
+                <span className="text-zenith-green">WildSalt.Lab</span>
                 <span className="w-px h-3 bg-zenith-muted"></span>
                 <button onClick={() => setIsSearchOpen(true)} className="hover:text-white flex items-center gap-1"><Icons.Command size={10}/> CMD+K</button>
                 <span className="w-px h-3 bg-zenith-muted"></span>

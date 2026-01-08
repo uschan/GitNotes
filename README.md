@@ -2,42 +2,68 @@
 
 > **A Supabase-powered, privacy-centric markdown knowledge base with Deep Space Industrial aesthetics.**
 
-![License](https://img.shields.io/badge/license-MIT-orange)
-![Version](https://img.shields.io/badge/version-3.0.0-white)
-![Status](https://img.shields.io/badge/system-CLOUD_SYNCED-green)
+![Version](https://img.shields.io/badge/VERSION-3.1.0-FF4D00)
+![Status](https://img.shields.io/badge/SYSTEM-ONLINE-00E676)
+![Stack](https://img.shields.io/badge/REACT-19-white)
+![Backend](https://img.shields.io/badge/SUPABASE-POSTGRES-white)
 
 ## 🪐 Overview
 
-GitNotes 3.0 transforms from a local storage app to a cloud-synced productivity tool. It uses a **"Secret Key"** mechanism to identify users, allowing for instant, anonymous, cross-device synchronization without traditional email/password registration.
+**GitNotes Zenith** is a high-fidelity personal knowledge base designed for long-term data survival. It rejects modern bloat in favor of raw speed, anonymity, and industrial utility. 
 
-**Key Features:**
-*   **Supabase Backend:** Real-time data persistence via PostgreSQL.
-*   **Secret Key Auth:** Generate a key on one device, paste it on another to sync. No email required.
-*   **Quick Capture:** Dedicated interface for rapidly logging thoughts, code snippets, and journal entries.
-*   **Command Interface:** Global `Cmd+K` / `Ctrl+K` command palette.
-*   **Advanced Editor:** Split-View, Syntax Highlighting, Toolbar.
+Unlike traditional note-taking apps, GitNotes uses a **"Secret Key"** mechanism. You generate a key on one device and enter it on another to establish a secure uplink. No emails, no passwords, no tracking.
 
-## 🛠️ Setup Guide
+## ⚡ Core Systems
+
+### 1. Data Visualization (Activity Matrix)
+*   **Thermal Grade Heatmap:** Visualize your writing frequency over the last year.
+*   **Responsive Scaling:** The matrix automatically adjusts its time horizon based on your viewport (Desktop: 364 days, Mobile: ~120 days).
+*   **Status Indicators:** Visual cues for system idle vs. active states.
+
+### 2. Smart Editor Environment
+*   **Split-View & Render:** Toggle between raw Markdown, split-pane, or pure preview.
+*   **Backlinks (Linked Mentions):** Type `[[` to instantly link other notes. View all incoming references at the bottom of any document.
+*   **Smart Paste:** Pasting HTML/Web content automatically converts it to clean Markdown (strips images/trackers).
+*   **Toolbar:** Quick formatting tools for mobile and desktop.
+*   **Mobile Optimized:** Truncated filenames and flexible layouts prevent UI clutter on small screens.
+
+### 3. Cloud Synchronization (Uplink)
+*   **Supabase Backend:** Real-time persistence via PostgreSQL.
+*   **Manual Sync:** Force-pull data via the dashboard button to ensure cross-device consistency.
+*   **Anonymous Auth:** Zero-knowledge identity via cryptographic keys.
+
+### 4. Quick Capture Protocol
+*   **Rapid Logging:** A dedicated accordion interface for dumping thoughts or code snippets without creating files manually.
+*   **Auto-Filing:** Automatically creates repositories or files if specific targets aren't selected.
+
+### 5. Keyboard Control
+*   **Global Command:** Press `Cmd+K` (Mac) or `Ctrl+K` (Windows) to instantly search all modules and files.
+
+---
+
+## 🛠️ Installation & Setup
 
 ### 1. Supabase Configuration
 1. Create a project at [supabase.com](https://supabase.com).
-2. Run the SQL script found below in your Supabase SQL Editor.
-3. Get your `Project URL` and `anon key` from API Settings.
+2. Go to the **SQL Editor** and run the schema script below.
+3. Retrieve your `Project URL` and `anon public key` from Project Settings > API.
 
 ### 2. Environment Variables
 Create a `.env` file in the root directory:
 
 ```env
-VITE_SUPABASE_URL=your_project_url
-VITE_SUPABASE_ANON_KEY=your_anon_key
+VITE_SUPABASE_URL=your_project_url_here
+VITE_SUPABASE_ANON_KEY=your_anon_key_here
 ```
 
-### 3. Database Schema
-Run this in Supabase SQL Editor:
+### 3. Database Schema (SQL)
+Run this in your Supabase SQL Editor to initialize the system:
 
 ```sql
+-- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
+-- Repositories Table
 create table repositories (
   id uuid default uuid_generate_v4() primary key,
   owner_id text not null,
@@ -49,6 +75,7 @@ create table repositories (
   language text default 'Markdown'
 );
 
+-- Files Table
 create table files (
   id uuid default uuid_generate_v4() primary key,
   repo_id uuid references repositories(id) on delete cascade,
@@ -59,6 +86,10 @@ create table files (
   size int default 0,
   updated_at timestamp with time zone default timezone('utc'::text, now())
 );
+
+-- Indexing for speed
+create index idx_owner_repos on repositories(owner_id);
+create index idx_repo_files on files(repo_id);
 ```
 
 ### 4. Run Locally
@@ -68,56 +99,28 @@ npm install
 npm run dev
 ```
 
-## 🚀 Deployment (Self-Hosted / VPS)
+## 🚀 Deployment
 
-Since GitNotes is a SPA (Single Page Application), it can be hosted on any static file server (Nginx, Vercel, Netlify).
+GitNotes is a pure SPA (Single Page Application). You can deploy it to Vercel, Netlify, or any Nginx static server.
 
-### 1. Build
+**Build Command:**
 ```bash
 npm run build
-# Output will be in the /dist folder
 ```
 
-### 2. Nginx Configuration (Recommended)
-If hosting on a VPS (Ubuntu/Debian), use this Nginx configuration to handle client-side routing.
+**Output Directory:**
+`dist`
 
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
+## 🎨 Aesthetic Guidelines (Zenith)
 
-    root /var/www/gitnotes/dist;
-    index index.html;
-
-    # Gzip Compression
-    gzip on;
-    gzip_min_length 1000;
-    gzip_types text/plain text/css application/json application/javascript text/xml;
-
-    # SPA Routing (Critical)
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Cache Static Assets
-    location /assets/ {
-        expires 1y;
-        add_header Cache-Control "public, no-transform";
-    }
-}
-```
-
-### 3. SSL (HTTPS)
-Secure your instance using Certbot:
-```bash
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d your-domain.com
-```
+*   **Palette:** Void Black (`#030303`), Zinc Surface (`#0F0F11`), International Orange (`#FF4D00`).
+*   **Typography:** Inter (UI) + JetBrains Mono (Data/Code).
+*   **Philosophy:** Tools should look like they belong in the cockpit of a spacecraft.
 
 ## 📜 License
 
-Designed by **WildSalt**.
-Licensed under MIT.
+**MIT License**. Designed by **WildSalt**.
+Free to fork, modify, and deploy for your own personal knowledge base.
 
 ---
 *End of Transmission // Zenith Systems*
