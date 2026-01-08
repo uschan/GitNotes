@@ -8,6 +8,22 @@ interface MarkdownPreviewProps {
   content: string;
 }
 
+// Utility to generate IDs from heading text
+export const generateSlug = (text: string): string => {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-') // Support Chinese characters & alphanumeric
+    .replace(/(^-|-$)+/g, '');
+};
+
+// Utility to extract text from React children (recursively if needed)
+const getNodeText = (node: any): string => {
+  if (['string', 'number'].includes(typeof node)) return node;
+  if (node instanceof Array) return node.map(getNodeText).join('');
+  if (typeof node === 'object' && node?.props?.children) return getNodeText(node.props.children);
+  return '';
+};
+
 const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content }) => {
   // Simple Frontmatter Parser
   let displayContent = content;
@@ -28,6 +44,21 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content }) => {
       });
     }
   }
+
+  const HeaderRenderer = ({ level, children, ...props }: any) => {
+    const text = getNodeText(children);
+    const slug = generateSlug(text);
+    const Tag = `h${level}` as React.ElementType;
+    
+    // Tailwind classes based on level
+    let classes = "font-bold tracking-tight text-white scroll-mt-20"; // scroll-mt handles sticky header offset
+    if (level === 1) classes += " text-3xl border-b border-zenith-border pb-4 mb-6 mt-8 first:mt-0";
+    if (level === 2) classes += " text-2xl mt-8 mb-4 flex items-center gap-2 before:content-['#'] before:text-zenith-orange/50 before:font-mono before:text-lg";
+    if (level === 3) classes += " text-xl font-semibold mt-6 mb-3";
+    if (level === 4) classes += " text-lg font-semibold mt-6 mb-2";
+
+    return React.createElement(Tag, { ...props, id: slug, className: classes }, children);
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -72,10 +103,10 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content }) => {
                 </code>
               )
             },
-            h1: ({node, ...props}) => <h1 className="text-3xl font-bold tracking-tight text-white border-b border-zenith-border pb-4 mb-6 mt-8 first:mt-0" {...props} />,
-            h2: ({node, ...props}) => <h2 className="text-2xl font-bold tracking-tight text-white mt-8 mb-4 flex items-center gap-2 before:content-['#'] before:text-zenith-orange/50 before:font-mono before:text-lg" {...props} />,
-            h3: ({node, ...props}) => <h3 className="text-xl font-semibold text-white mt-6 mb-3" {...props} />,
-            h4: ({node, ...props}) => <h4 className="text-lg font-semibold text-white mt-6 mb-2" {...props} />,
+            h1: ({node, children, ...props}) => <HeaderRenderer level={1} children={children} {...props} />,
+            h2: ({node, children, ...props}) => <HeaderRenderer level={2} children={children} {...props} />,
+            h3: ({node, children, ...props}) => <HeaderRenderer level={3} children={children} {...props} />,
+            h4: ({node, children, ...props}) => <HeaderRenderer level={4} children={children} {...props} />,
             p: ({node, ...props}) => <p className="text-zenith-text leading-7 mb-4" {...props} />,
             blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-zenith-orange pl-4 bg-zenith-surface/30 py-2 pr-2 text-zenith-muted italic my-6" {...props} />,
             

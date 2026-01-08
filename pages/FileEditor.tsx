@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Repository } from '../types';
 import { Icons } from '../components/Icon';
-import MarkdownPreview from '../components/MarkdownPreview';
+import MarkdownPreview, { generateSlug } from '../components/MarkdownPreview';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import EditorToolbar from '../components/EditorToolbar';
 // Use default import for Turndown, but handle 'default' property at runtime if needed
@@ -20,6 +20,12 @@ interface FileEditorProps {
 }
 
 type ViewMode = 'write' | 'preview' | 'split';
+
+interface TocItem {
+  id: string;
+  text: string;
+  level: number;
+}
 
 const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFile, isAuthenticated }) => {
   const { repoId, fileId } = useParams<{ repoId: string; fileId: string }>();
@@ -40,6 +46,48 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
       setContent(file.content);
     }
   }, [file]);
+
+  // --- Table of Contents Logic ---
+  const toc = useMemo(() => {
+    if (!content) return [];
+    
+    // Regex to match # Heading, ## Heading etc.
+    // Handles simple markdown headers
+    const headingRegex = /^(#{1,3})\s+(.+)$/gm;
+    const items: TocItem[] = [];
+    let match;
+
+    // We need to work on a version without code blocks to avoid false positives in code
+    // This is a simplified parser; for perfect accuracy one would need AST, but regex is usually fast/enough for basic usage
+    // To respect code blocks, we simple strip lines starting with ``` for the search context, but keeping it simple for now:
+    
+    const lines = content.split('\n');
+    let inCodeBlock = false;
+
+    lines.forEach(line => {
+        if (line.trim().startsWith('```')) {
+            inCodeBlock = !inCodeBlock;
+            return;
+        }
+        if (inCodeBlock) return;
+
+        const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+        if (headingMatch) {
+            const level = headingMatch[1].length;
+            const text = headingMatch[2].trim();
+            // Remove markdown links or bold from TOC text if present
+            const cleanText = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/(\*\*|__)(.*?)\1/g, '$2');
+            
+            items.push({
+                id: generateSlug(cleanText),
+                text: cleanText,
+                level
+            });
+        }
+    });
+
+    return items;
+  }, [content]);
 
   if (!repo || !file) {
     return <div className="h-screen flex items-center justify-center font-mono text-zenith-orange">ERROR: FILE DATA CORRUPTED OR MISSING</div>;
@@ -111,18 +159,14 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
     const clipboardData = e.clipboardData;
     const types = clipboardData.types;
     
-    // console.log("GitNotes Paste Debug: Available Types ->", types);
-
     // Check for HTML content
     if (types.includes('text/html')) {
         const html = clipboardData.getData('text/html');
-        // console.log("GitNotes Paste Debug: Found HTML content, length:", html.length);
         
         try {
-            e.preventDefault(); // Prevent default plain text paste immediately
+            e.preventDefault(); 
 
             // 1. Robust Constructor Resolution
-            // In Vite prod builds, sometimes CJS modules are wrapped in { default: ... }
             let ServiceClass = TurndownService;
             // @ts-ignore
             if (typeof ServiceClass !== 'function' && ServiceClass.default) {
@@ -147,13 +191,16 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
             try {
                 if (typeof gfm === 'function') {
                     turndownService.use(gfm);
-                    // console.log("GitNotes Debug: GFM Plugin applied.");
                 } else {
                     console.warn("GitNotes Warning: GFM plugin not available, skipping tables support.");
                 }
             } catch (pluginErr) {
                 console.warn("GitNotes Warning: Error applying GFM plugin, continuing with basic markdown.", pluginErr);
             }
+
+            // Pure Text Mode: Remove images
+            turndownService.remove('img');
+            turndownService.remove('picture');
 
             // 4. Custom Rules
             turndownService.addRule('pre', {
@@ -167,7 +214,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
             const markdown = turndownService.turndown(html);
             
             // Visual Feedback
-            setConversionStatus("SMART PASTE: MARKDOWN");
+            setConversionStatus("SMART PASTE: TEXT ONLY");
             setTimeout(() => setConversionStatus(null), 3000);
 
             insertTextAtCursor(markdown);
@@ -184,8 +231,6 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
         }
         return;
     }
-    
-    // console.log("GitNotes Paste: Plain text mode");
   };
 
   const lineCount = content.split('\n').length;
@@ -290,12 +335,48 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
            </div>
          )}
 
-         {/* Preview Panel */}
+         {/* Preview Panel Wrapper (Now Flex for Sidebar) */}
          {(viewMode === 'preview' || viewMode === 'split') && (
-           <div className={`flex-1 overflow-auto bg-zenith-bg ${viewMode === 'split' ? 'bg-[#080808]' : ''}`}>
-               <div className={`p-8 mx-auto ${viewMode === 'split' ? 'max-w-none' : 'max-w-4xl'}`}>
-                   <MarkdownPreview content={content} />
+           <div className={`flex flex-1 overflow-hidden bg-zenith-bg ${viewMode === 'split' ? 'bg-[#080808]' : ''}`}>
+               
+               {/* Actual Preview Content */}
+               <div className="flex-1 overflow-y-auto overflow-x-hidden">
+                   <div className={`p-8 mx-auto ${viewMode === 'split' ? 'max-w-none' : 'max-w-4xl'}`}>
+                       <MarkdownPreview content={content} />
+                   </div>
+                   {/* Bottom Spacer for comfortable reading */}
+                   <div className="h-32"></div>
                </div>
+
+                {/* Outline Sidebar (Visible in Preview Mode mainly, or Split if room permits) */}
+                {viewMode === 'preview' && toc.length > 0 && (
+                    <div className="hidden xl:flex w-72 flex-col border-l border-zenith-border bg-zenith-bg/50 backdrop-blur-sm">
+                        <div className="p-4 border-b border-zenith-border font-mono text-[10px] tracking-widest text-zenith-muted uppercase flex items-center gap-2">
+                            <Icons.List size={12} />
+                            <span>Document Outline</span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-1">
+                            {toc.map((item, idx) => (
+                                <a 
+                                    key={`${item.id}-${idx}`}
+                                    href={`#${item.id}`}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' });
+                                    }}
+                                    className={`
+                                        block text-xs font-mono py-1.5 transition-colors duration-200 border-l-2 border-transparent hover:border-zenith-orange pl-3
+                                        ${item.level === 1 ? 'text-white font-bold' : 'text-zenith-muted hover:text-zenith-text'}
+                                        ${item.level === 2 ? 'ml-2' : ''}
+                                        ${item.level === 3 ? 'ml-4' : ''}
+                                    `}
+                                >
+                                    {item.text}
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                )}
            </div>
          )}
 

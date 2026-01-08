@@ -135,6 +135,10 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
                 console.warn("GFM plugin failed", e);
             }
 
+            // Pure Text Mode: Remove images
+            turndownService.remove('img');
+            turndownService.remove('picture'); // Also remove picture tags often used for responsive images
+
             // Custom rule for pre tags
             turndownService.addRule('pre', {
                 filter: ['pre'],
@@ -145,7 +149,7 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
 
             const markdown = turndownService.turndown(html);
             
-            setConversionStatus("SMART PASTE: MARKDOWN");
+            setConversionStatus("SMART PASTE: TEXT ONLY");
             setTimeout(() => setConversionStatus(null), 3000);
 
             insertTextAtCursor(markdown);
@@ -212,7 +216,7 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
                     value={content}
                     onChange={e => setContent(e.target.value)}
                     onPaste={handlePaste}
-                    placeholder="Enter raw data stream... (Paste HTML to auto-convert)"
+                    placeholder="Enter raw data stream... (Auto-converts to clean Markdown, images removed)"
                     className="w-full bg-black border border-zenith-border p-4 text-white font-mono text-sm focus:border-zenith-orange focus:outline-none min-h-[120px] resize-y"
                 />
 
