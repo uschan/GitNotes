@@ -34,7 +34,11 @@ import {
   Code,
   Image,
   Zap,
-  Lock
+  Lock,
+  Github,
+  Instagram,
+  Twitter,
+  Globe
 } from 'lucide-react';
 
 export const Icons = {
@@ -72,5 +76,9 @@ export const Icons = {
   Code,
   Image,
   Zap,
-  Lock
+  Lock,
+  Github,
+  Instagram,
+  Twitter,
+  Globe
 };

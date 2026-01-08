@@ -5,8 +5,10 @@ import { Icons } from '../components/Icon';
 import MarkdownPreview from '../components/MarkdownPreview';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import EditorToolbar from '../components/EditorToolbar';
-import TurndownService from 'turndown';
-// Standard named import is the correct way for this library in Vite/ESM
+// Import Turndown generically to handle both CJS and ESM environments in Vite
+// @ts-ignore
+import * as TurndownServiceModule from 'turndown';
+// Use named import for gfm plugin
 // @ts-ignore
 import { gfm } from 'turndown-plugin-gfm';
 
@@ -111,71 +113,78 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
     
     console.log("GitNotes Paste Debug: Available Types ->", types);
 
-    // Check for HTML content
+    // Check for HTML content presence regardless of tags (to catch edge cases)
     if (types.includes('text/html')) {
         const html = clipboardData.getData('text/html');
-        console.log("GitNotes Paste Debug: Raw HTML length ->", html.length);
+        console.log("GitNotes Paste Debug: HTML content found. Length:", html.length);
+        console.log("GitNotes Paste Debug: HTML snippet:", html.substring(0, 100));
         
-        // Relaxed check: Look for common HTML tags or simple structure
-        const hasTags = /<(p|div|br|span|h[1-6]|ul|ol|li|table|a|b|i|strong|em|code|pre)/i.test(html);
+        // We will attempt conversion whenever HTML is present, skipping the regex check
+        // because sometimes simple bold/italic text or code blocks won't have complex tags structure
+        // that matches a strict regex.
         
-        if (hasTags) {
-            console.log("GitNotes Paste Debug: HTML tags detected, starting Turndown...");
-            e.preventDefault(); // Stop default plain text paste
+        try {
+            console.log("GitNotes Paste Debug: Attempting Turndown conversion...");
+            e.preventDefault(); // Stop default plain text paste immediately
+
+            // Robustly resolve the Turndown constructor
+            // Vite/Rollup can sometimes bundle CJS modules as `default` export or flat exports.
+            // @ts-ignore
+            const TurndownService = TurndownServiceModule.default || TurndownServiceModule;
             
-            try {
-                const turndownService = new TurndownService({
-                    headingStyle: 'atx',
-                    codeBlockStyle: 'fenced',
-                    bulletListMarker: '-',
-                    emDelimiter: '*'
-                });
-                
-                // Use the imported named export
-                if (typeof gfm === 'function') {
-                     try {
-                         turndownService.use(gfm);
-                         console.log("GitNotes Debug: GFM Plugin loaded successfully");
-                     } catch (pluginError) {
-                         console.warn("GitNotes Warning: Failed to apply GFM plugin", pluginError);
-                     }
-                } else {
-                    console.warn("GitNotes Warning: GFM plugin is not a function", gfm);
-                }
-
-                // Custom rule for pre tags to ensure code blocks work well
-                turndownService.addRule('pre', {
-                    filter: ['pre'],
-                    replacement: function (content, node) {
-                         return '\n```\n' + node.textContent + '\n```\n';
-                    }
-                });
-
-                const markdown = turndownService.turndown(html);
-                console.log("GitNotes Paste Debug: Conversion success. Length ->", markdown.length);
-                
-                // Visual Feedback
-                setConversionStatus("RICH TEXT CONVERTED");
-                setTimeout(() => setConversionStatus(null), 3000);
-
-                insertTextAtCursor(markdown);
-
-            } catch (err) {
-                console.error("GitNotes Error: Paste conversion critical failure:", err);
-                
-                // Fallback: manually insert the plain text since we prevented default
-                const plainText = clipboardData.getData('text/plain');
-                insertTextAtCursor(plainText);
-                
-                setConversionStatus("CONVERSION FAILED - PASTED PLAIN TEXT");
-                setTimeout(() => setConversionStatus(null), 3000);
+            if (typeof TurndownService !== 'function') {
+                throw new Error(`TurndownService is not a constructor. It is type: ${typeof TurndownService}`);
             }
-            return;
+
+            const turndownService = new TurndownService({
+                headingStyle: 'atx',
+                codeBlockStyle: 'fenced',
+                bulletListMarker: '-',
+                emDelimiter: '*'
+            });
+            
+            // Apply GFM plugin if available
+            if (typeof gfm === 'function') {
+                 try {
+                     turndownService.use(gfm);
+                 } catch (pluginError) {
+                     console.warn("GitNotes Warning: Failed to apply GFM plugin", pluginError);
+                 }
+            } else {
+                console.warn("GitNotes Warning: GFM plugin is not a function:", gfm);
+            }
+
+            // Custom rule for pre tags to ensure code blocks work well
+            turndownService.addRule('pre', {
+                filter: ['pre'],
+                replacement: function (content, node) {
+                     return '\n```\n' + node.textContent + '\n```\n';
+                }
+            });
+
+            const markdown = turndownService.turndown(html);
+            console.log("GitNotes Paste Debug: Conversion success. MD Length:", markdown.length);
+            
+            // Visual Feedback
+            setConversionStatus("RICH TEXT CONVERTED");
+            setTimeout(() => setConversionStatus(null), 3000);
+
+            insertTextAtCursor(markdown);
+
+        } catch (err) {
+            console.error("GitNotes Error: Paste conversion failed:", err);
+            
+            // Fallback: insert the plain text
+            const plainText = clipboardData.getData('text/plain');
+            insertTextAtCursor(plainText);
+            
+            setConversionStatus("CONVERSION FAILED - PLAIN TEXT");
+            setTimeout(() => setConversionStatus(null), 3000);
         }
+        return;
     }
     
-    // If we get here, it's just plain text or the HTML check failed
-    console.log("GitNotes Paste Debug: Treating as plain text");
+    console.log("GitNotes Paste Debug: No HTML type found, default paste.");
   };
 
   const lineCount = content.split('\n').length;
