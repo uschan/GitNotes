@@ -6,8 +6,8 @@ import MarkdownPreview from '../components/MarkdownPreview';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import EditorToolbar from '../components/EditorToolbar';
 import TurndownService from 'turndown';
-// Use namespace import to handle potential CommonJS/ESM interop issues with Vite
-import * as TurndownPluginGfm from 'turndown-plugin-gfm';
+// @ts-ignore
+import { gfm } from 'turndown-plugin-gfm';
 
 interface FileEditorProps {
   repos: Repository[];
@@ -115,6 +115,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
         const html = clipboardData.getData('text/html');
         
         // Basic check: Does it look like HTML? (tags)
+        // We use a simple regex to detect HTML tags.
         if (/<[a-z][\s\S]*>/i.test(html)) {
             console.log("HTML content detected, attempting conversion...");
             e.preventDefault(); // Stop default plain text paste
@@ -127,13 +128,9 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                     emDelimiter: '*'
                 });
                 
-                // Safely load GFM plugin
-                // @ts-ignore
-                const gfmPlugin = TurndownPluginGfm.gfm || TurndownPluginGfm.default?.gfm;
-                if (gfmPlugin) {
-                    turndownService.use(gfmPlugin);
-                } else {
-                    console.warn("Turndown GFM plugin not found, using basic conversion.");
+                // Use the imported gfm plugin
+                if (gfm) {
+                    turndownService.use(gfm);
                 }
 
                 // Custom rule for pre tags to ensure code blocks work well
