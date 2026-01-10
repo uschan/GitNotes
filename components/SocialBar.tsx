@@ -2,7 +2,7 @@ import React from 'react';
 import { Icons } from './Icon';
 
 // Custom wrapper for consistency
-const SocialLink = ({ href, children, label }: { href: string; children: React.ReactNode; label: string }) => (
+const SocialLink = ({ href, children, label }: { href: string; children?: React.ReactNode; label: string }) => (
   <a 
     href={href} 
     target="_blank" 

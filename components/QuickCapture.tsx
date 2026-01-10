@@ -236,7 +236,7 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
                     onChange={e => setContent(e.target.value)}
                     onPaste={handlePaste}
                     placeholder="Enter raw data stream... (Auto-converts to clean Markdown, images removed)"
-                    className="w-full bg-black border border-zenith-border p-4 text-white font-mono text-sm focus:border-zenith-orange focus:outline-none min-h-[120px] max-h-[60vh] overflow-hidden resize-none"
+                    className="w-full bg-black border border-zenith-border p-4 text-white font-mono text-sm focus:border-zenith-orange focus:outline-none min-h-[120px] max-h-[60vh] overflow-y-auto resize-none"
                     style={{ height: 'auto' }}
                 />
 
