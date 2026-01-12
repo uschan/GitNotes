@@ -137,6 +137,44 @@ function App() {
       }));
   }
 
+  // --- Pixel Art Logic ---
+  const handlePixelArt = async (date: string) => {
+      if (!secretKey) return;
+
+      // 1. Find or Create 'contribution-art' repo
+      let targetRepo = repos.find(r => r.name === 'contribution-art');
+      let targetRepoId = targetRepo?.id;
+
+      if (!targetRepoId) {
+          // Create hidden repo for art
+          const newRepo = await api.createRepo(secretKey, 'contribution-art', 'Automated repository for contribution graph pixel art.', true);
+          if (newRepo) {
+              targetRepoId = newRepo.id;
+              setRepos(prev => [newRepo, ...prev]);
+          } else {
+              alert("Failed to initialize Pixel Art Module.");
+              return;
+          }
+      }
+
+      // 2. Add Dummy File with specific date
+      // We append a random ID to allow multiple commits per day (darker colors)
+      const dummyName = `pixel-${date}-${Math.floor(Math.random() * 1000)}.md`;
+      const dummyContent = `# Pixel Art Entry\n\nAutomated entry for visual data manipulation.\nDate: ${date}`;
+      
+      const newFile = await api.addFile(secretKey, targetRepoId, dummyName, dummyContent, date);
+
+      if (newFile) {
+          // Update local state to reflect change immediately in the graph
+          setRepos(prev => prev.map(repo => {
+              if (repo.id === targetRepoId) {
+                  return { ...repo, files: [newFile, ...repo.files] };
+              }
+              return repo;
+          }));
+      }
+  };
+
   // If not authenticated, show the Access Gate
   if (!secretKey) {
       return <AccessGate onUnlock={handleUnlock} />;
@@ -160,6 +198,7 @@ function App() {
                     onQuickSave={handleQuickSave}
                     onSync={handleSync}
                     isLoading={loading}
+                    onPixelArt={handlePixelArt}
                 />
             } 
           />

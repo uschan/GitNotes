@@ -11,9 +11,16 @@ interface DashboardProps {
   onQuickSave: (repoId: string, title: string, content: string) => Promise<void>;
   onSync: () => void;
   isLoading: boolean;
+  // We need to access api to perform the specialized addFile with date, 
+  // but since we are props-drilling, we'll just expose a special prop or reuse onQuickSave if we modify App.tsx. 
+  // Actually, easiest is to pass a specialized handler from App.tsx. 
+  // BUT, since we didn't update App.tsx to pass a new prop, we can implement the logic here if we had access to API, 
+  // or better, let's update App.tsx to pass 'onPixelArt'. 
+  // WAITING: I will assume I can modify App.tsx next.
+  onPixelArt?: (date: string) => Promise<void>;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ repos, onCreateRepo, onQuickSave, onSync, isLoading }) => {
+const Dashboard: React.FC<DashboardProps> = ({ repos, onCreateRepo, onQuickSave, onSync, isLoading, onPixelArt }) => {
   const [showNewRepoModal, setShowNewRepoModal] = useState(false);
   const [newRepoName, setNewRepoName] = useState('');
   const [newRepoDesc, setNewRepoDesc] = useState('');
@@ -72,8 +79,8 @@ const Dashboard: React.FC<DashboardProps> = ({ repos, onCreateRepo, onQuickSave,
         <div className="text-center py-20 font-mono text-zenith-orange animate-pulse">ESTABLISHING DATABASE CONNECTION...</div>
       ) : (
           <div className="space-y-8">
-            {/* Contribution Graph */}
-            <ContributionGraph repos={repos} />
+            {/* Contribution Graph with Pixel Art Hook */}
+            <ContributionGraph repos={repos} onDrawPixel={onPixelArt} />
 
             {/* Grid Layout */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -78,10 +78,12 @@ const localProvider = {
     localProvider.saveData(repos.filter(r => r.id !== repoId));
   },
 
-  addFile: async (repoId: string, name: string, content: string): Promise<FileItem | null> => {
+  addFile: async (repoId: string, name: string, content: string, customDate?: string): Promise<FileItem | null> => {
     const repos = localProvider.getData();
     const repoIndex = repos.findIndex(r => r.id === repoId);
     if (repoIndex === -1) return null;
+
+    const timestamp = customDate ? new Date(customDate).toISOString() : new Date().toISOString();
 
     const newFile: FileItem = {
       id: uuidv4(),
@@ -89,11 +91,17 @@ const localProvider = {
       content,
       language: 'markdown',
       size: new Blob([content]).size,
-      updatedAt: new Date().toISOString()
+      updatedAt: timestamp
     };
 
     repos[repoIndex].files.unshift(newFile);
-    repos[repoIndex].updatedAt = new Date().toISOString();
+    // Also update repo timestamp to match the latest file if it's newer, 
+    // but for pixel art (backdating), we usually don't want to bring the repo to the top of the list if it's old.
+    // However, simplicity sake, we update repo timestamp if it's a current action.
+    if (!customDate) {
+        repos[repoIndex].updatedAt = timestamp;
+    }
+    
     localProvider.saveData(repos);
     return newFile;
   },
@@ -191,11 +199,13 @@ export const api = {
     if (error) throw error;
   },
 
-  addFile: async (secretKey: string, repoId: string, name: string, content: string): Promise<FileItem | null> => {
+  addFile: async (secretKey: string, repoId: string, name: string, content: string, customDate?: string): Promise<FileItem | null> => {
     const client = getAuthenticatedClient(secretKey);
-    if (!client) return localProvider.addFile(repoId, name, content);
+    if (!client) return localProvider.addFile(repoId, name, content, customDate);
 
     const size = new Blob([content]).size;
+    const timestamp = customDate ? new Date(customDate).toISOString() : new Date().toISOString();
+
     const { data, error } = await client
       .from('files')
       .insert([{ 
@@ -203,15 +213,20 @@ export const api = {
         owner_id: secretKey,
         name, 
         content, 
-        size 
+        size,
+        updated_at: timestamp 
       }])
       .select()
       .single();
 
     if (error) throw error;
     
-    // Update repo timestamp
-    await client.from('repositories').update({ updated_at: new Date().toISOString() }).eq('id', repoId);
+    // We only update the repo's 'updated_at' if this is a NEW file (now), 
+    // we don't want backdated pixel art to bring the repo to the top of the list in the dashboard
+    if (!customDate) {
+        await client.from('repositories').update({ updated_at: new Date().toISOString() }).eq('id', repoId);
+    }
+    
     return mapFile(data);
   },
 
