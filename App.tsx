@@ -74,13 +74,13 @@ function App() {
 
   const handleUpdateRepo = async (repoId: string, name: string, description: string) => {
     if (!secretKey) return;
-    await api.updateRepo(repoId, name, description);
+    await api.updateRepo(secretKey, repoId, name, description);
     setRepos(prev => prev.map(r => r.id === repoId ? { ...r, name, description, updatedAt: new Date().toISOString() } : r));
   };
 
   const handleDeleteRepo = async (repoId: string) => {
       if (!secretKey) return;
-      await api.deleteRepo(repoId);
+      await api.deleteRepo(secretKey, repoId);
       setRepos(prev => prev.filter(r => r.id !== repoId));
   }
 
@@ -114,7 +114,7 @@ function App() {
 
   const handleUpdateFile = async (repoId: string, fileId: string, newContent: string) => {
     if (!secretKey) return;
-    await api.updateFile(fileId, newContent);
+    await api.updateFile(secretKey, fileId, newContent);
     setRepos(prev => prev.map(repo => {
         if (repo.id === repoId) {
             return {
@@ -128,7 +128,7 @@ function App() {
 
   const handleDeleteFile = async (repoId: string, fileId: string) => {
       if (!secretKey) return;
-      await api.deleteFile(fileId);
+      await api.deleteFile(secretKey, fileId);
       setRepos(prev => prev.map(repo => {
           if (repo.id === repoId) {
               return { ...repo, files: repo.files.filter(f => f.id !== fileId) };

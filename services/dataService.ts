@@ -1,11 +1,10 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, getAuthenticatedClient, isSupabaseConfigured } from '../lib/supabase';
 import { Repository, FileItem } from '../types';
 import { INITIAL_REPOS } from '../constants';
 import { v4 as uuidv4 } from 'uuid';
 
 // --- Types & Mappers ---
 
-// Helper to map DB snake_case to App camelCase
 const mapRepo = (r: any): Repository => ({
   id: r.id,
   name: r.name,
@@ -48,7 +47,6 @@ const localProvider = {
   },
 
   getRepos: async (): Promise<Repository[]> => {
-    // Simulate network delay
     await new Promise(r => setTimeout(r, 300));
     return localProvider.getData();
   },
@@ -94,7 +92,7 @@ const localProvider = {
       updatedAt: new Date().toISOString()
     };
 
-    repos[repoIndex].files.unshift(newFile); // Add to top
+    repos[repoIndex].files.unshift(newFile);
     repos[repoIndex].updatedAt = new Date().toISOString();
     localProvider.saveData(repos);
     return newFile;
@@ -136,13 +134,15 @@ const localProvider = {
 // --- Public API ---
 
 export const api = {
-  getRepos: async (ownerId: string): Promise<Repository[]> => {
-    if (!isSupabaseConfigured || !supabase) return localProvider.getRepos();
+  getRepos: async (secretKey: string): Promise<Repository[]> => {
+    const client = getAuthenticatedClient(secretKey);
+    if (!client) return localProvider.getRepos();
 
-    const { data, error } = await supabase
+    // Use secretKey as ownerId
+    const { data, error } = await client
       .from('repositories')
       .select('*, files(*)')
-      .eq('owner_id', ownerId)
+      .eq('owner_id', secretKey)
       .order('updated_at', { ascending: false });
 
     if (error) {
@@ -158,12 +158,13 @@ export const api = {
     return repos;
   },
 
-  createRepo: async (ownerId: string, name: string, description: string, isPrivate: boolean): Promise<Repository | null> => {
-    if (!isSupabaseConfigured || !supabase) return localProvider.createRepo(name, description, isPrivate);
+  createRepo: async (secretKey: string, name: string, description: string, isPrivate: boolean): Promise<Repository | null> => {
+    const client = getAuthenticatedClient(secretKey);
+    if (!client) return localProvider.createRepo(name, description, isPrivate);
 
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('repositories')
-      .insert([{ owner_id: ownerId, name, description, is_private: isPrivate }])
+      .insert([{ owner_id: secretKey, name, description, is_private: isPrivate }])
       .select()
       .single();
 
@@ -171,32 +172,35 @@ export const api = {
     return { ...mapRepo(data), files: [] };
   },
 
-  updateRepo: async (repoId: string, name: string, description: string) => {
-    if (!isSupabaseConfigured || !supabase) return localProvider.updateRepo(repoId, name, description);
+  updateRepo: async (secretKey: string, repoId: string, name: string, description: string) => {
+    const client = getAuthenticatedClient(secretKey);
+    if (!client) return localProvider.updateRepo(repoId, name, description);
 
-    const { error } = await supabase
+    const { error } = await client
       .from('repositories')
       .update({ name, description, updated_at: new Date().toISOString() })
-      .eq('id', repoId);
+      .eq('id', repoId); // RLS will implicitly check owner_id via header
     if (error) throw error;
   },
 
-  deleteRepo: async (repoId: string) => {
-    if (!isSupabaseConfigured || !supabase) return localProvider.deleteRepo(repoId);
+  deleteRepo: async (secretKey: string, repoId: string) => {
+    const client = getAuthenticatedClient(secretKey);
+    if (!client) return localProvider.deleteRepo(repoId);
 
-    const { error } = await supabase.from('repositories').delete().eq('id', repoId);
+    const { error } = await client.from('repositories').delete().eq('id', repoId);
     if (error) throw error;
   },
 
-  addFile: async (ownerId: string, repoId: string, name: string, content: string): Promise<FileItem | null> => {
-    if (!isSupabaseConfigured || !supabase) return localProvider.addFile(repoId, name, content);
+  addFile: async (secretKey: string, repoId: string, name: string, content: string): Promise<FileItem | null> => {
+    const client = getAuthenticatedClient(secretKey);
+    if (!client) return localProvider.addFile(repoId, name, content);
 
     const size = new Blob([content]).size;
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('files')
       .insert([{ 
         repo_id: repoId, 
-        owner_id: ownerId,
+        owner_id: secretKey,
         name, 
         content, 
         size 
@@ -206,25 +210,28 @@ export const api = {
 
     if (error) throw error;
     
-    await supabase.from('repositories').update({ updated_at: new Date().toISOString() }).eq('id', repoId);
+    // Update repo timestamp
+    await client.from('repositories').update({ updated_at: new Date().toISOString() }).eq('id', repoId);
     return mapFile(data);
   },
 
-  updateFile: async (fileId: string, content: string) => {
-    if (!isSupabaseConfigured || !supabase) return localProvider.updateFile(fileId, content);
+  updateFile: async (secretKey: string, fileId: string, content: string) => {
+    const client = getAuthenticatedClient(secretKey);
+    if (!client) return localProvider.updateFile(fileId, content);
 
     const size = new Blob([content]).size;
-    const { error } = await supabase
+    const { error } = await client
       .from('files')
       .update({ content, size, updated_at: new Date().toISOString() })
       .eq('id', fileId);
     if (error) throw error;
   },
 
-  deleteFile: async (fileId: string) => {
-    if (!isSupabaseConfigured || !supabase) return localProvider.deleteFile(fileId);
+  deleteFile: async (secretKey: string, fileId: string) => {
+    const client = getAuthenticatedClient(secretKey);
+    if (!client) return localProvider.deleteFile(fileId);
 
-    const { error } = await supabase.from('files').delete().eq('id', fileId);
+    const { error } = await client.from('files').delete().eq('id', fileId);
     if (error) throw error;
   }
 };
