@@ -63,7 +63,7 @@ const AccessGate: React.FC<AccessGateProps> = ({ onUnlock }) => {
               <span className="font-mono text-[10px] tracking-[0.2em] text-zenith-muted uppercase">Zenith Systems // Secure Uplink</span>
           </div>
           <div className="font-mono text-[10px] text-zenith-muted uppercase hidden sm:block">
-              SYS.VER.3.0.0
+              SYS.VER.3.1.0
           </div>
       </header>
 
@@ -80,7 +80,8 @@ const AccessGate: React.FC<AccessGateProps> = ({ onUnlock }) => {
                         GIT<span className="text-zenith-orange">NOTES</span>
                     </h1>
                     <p className="text-lg md:text-xl text-zenith-muted font-mono max-w-2xl mx-auto leading-relaxed">
-                        The minimal, local-first knowledge base with encrypted cloud synchronization. <br className="hidden md:block"/>Designed for long-term data survival.
+                        The serverless, privacy-first knowledge base.<br className="hidden md:block"/>
+                        Deployed on the edge. Controlled by you.
                     </p>
                 </div>
 
@@ -88,8 +89,8 @@ const AccessGate: React.FC<AccessGateProps> = ({ onUnlock }) => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left max-w-3xl mx-auto">
                     <div className="bg-zenith-surface/50 border border-zenith-border p-5 hover:border-zenith-orange/50 transition-colors group">
                         <Icons.Database className="text-zenith-muted group-hover:text-zenith-orange mb-3" size={24} />
-                        <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-2">Cloud Persistence</h3>
-                        <p className="text-zenith-muted text-xs leading-5">Real-time database sync via Supabase. Your ideas, available everywhere.</p>
+                        <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-2">Edge Persistence</h3>
+                        <p className="text-zenith-muted text-xs leading-5">Zero maintenance. Powered by Vercel & Supabase for infinite scale and zero cost.</p>
                     </div>
                     <div className="bg-zenith-surface/50 border border-zenith-border p-5 hover:border-zenith-orange/50 transition-colors group">
                         <Icons.Lock className="text-zenith-muted group-hover:text-zenith-orange mb-3" size={24} />
@@ -98,8 +99,8 @@ const AccessGate: React.FC<AccessGateProps> = ({ onUnlock }) => {
                     </div>
                     <div className="bg-zenith-surface/50 border border-zenith-border p-5 hover:border-zenith-orange/50 transition-colors group">
                         <Icons.Zap className="text-zenith-muted group-hover:text-zenith-orange mb-3" size={24} />
-                        <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-2">Quick Capture</h3>
-                        <p className="text-zenith-muted text-xs leading-5">Low-latency interface designed for rapid thought logging and code storage.</p>
+                        <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-2">Time Travel</h3>
+                        <p className="text-zenith-muted text-xs leading-5">Hack your contribution graph. Leave pixel art in your commit history.</p>
                     </div>
                 </div>
 
