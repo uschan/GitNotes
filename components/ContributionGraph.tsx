@@ -214,18 +214,28 @@ const ContributionGraph: React.FC<ContributionGraphProps> = ({ repos, onDrawPixe
       if (!pendingStampData || !onDrawPixel) return;
       
       setIsStamping(true);
+      
+      // CRITICAL FIX: Clear preview overlays immediately so the user can see 
+      // the pixels "turning on" one by one on the underlying grid.
+      // If we don't clear these, the "Preview" style (pulsing orange) masks the 
+      // actual intensity changes happening in the loop.
+      setSelectedTemplate(null);
+      setPreviewAnchorDate(null);
+
       try {
          for (const idx of pendingStampData.indices) {
              const item = weeks[idx];
              if (item && item.date) {
                  await onDrawPixel(item.date);
-                 await new Promise(r => setTimeout(r, 50)); 
+                 // Increase delay slightly for better visual "pop"
+                 await new Promise(r => setTimeout(r, 60)); 
              }
          }
       } catch (e) {
           console.error("Stamp Error:", e);
       } finally {
           setIsStamping(false);
+          // These are already cleared, but good safety measure
           setSelectedTemplate(null); 
           setPendingStampData(null);
           setPreviewAnchorDate(null);
@@ -347,7 +357,7 @@ const ContributionGraph: React.FC<ContributionGraphProps> = ({ repos, onDrawPixe
                                 onMouseEnter={() => setHoverDate(day.date)}
                                 onMouseLeave={() => setHoverDate(null)}
                                 title={isPixelMode ? (selectedTemplate ? (isAnchor ? "Click again to confirm" : `Preview ${selectedTemplate}`) : `Draw Pixel ${day.date}`) : `${day.count} updates`}
-                                className={`w-2.5 h-2.5 rounded-[1px] transition-all duration-100 border border-transparent 
+                                className={`w-2.5 h-2.5 rounded-[1px] transition-all duration-300 border border-transparent 
                                     ${isPixelMode && !isStamping ? 'cursor-pointer' : ''}
                                     ${isPreview ? 'bg-zenith-orange animate-pulse z-10' : ''}
                                     ${isPreview && isAnchor ? 'ring-2 ring-white ring-opacity-50 scale-125' : isPreview ? 'scale-110 shadow-[0_0_5px_#FF4D00]' : ''}
