@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
@@ -18,6 +18,9 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [secretKey, setSecretKey] = useState<string | null>(null);
   
+  // Ref to track the art repo ID across async calls/stale closures
+  const artRepoIdRef = useRef<string | null>(null);
+
   // Theme State
   const [theme, setTheme] = useState<Theme>(() => {
       return (localStorage.getItem('gitnotes_theme') as Theme) || 'orange';
@@ -45,6 +48,14 @@ function App() {
       }
   }, []);
 
+  // Sync ref with state when data loads
+  useEffect(() => {
+      const artRepo = repos.find(r => r.name === 'contribution-art');
+      if (artRepo) {
+          artRepoIdRef.current = artRepo.id;
+      }
+  }, [repos]);
+
   // Initial Auth Check is handled by AccessGate, which calls handleUnlock
   const handleUnlock = (key: string) => {
       setSecretKey(key);
@@ -55,6 +66,7 @@ function App() {
       localStorage.removeItem('gitnotes_secret_key');
       setSecretKey(null);
       setRepos([]);
+      artRepoIdRef.current = null;
   };
 
   // Explicit Sync Action for Button
@@ -95,6 +107,10 @@ function App() {
       if (!secretKey) return;
       await api.deleteRepo(secretKey, repoId);
       setRepos(prev => prev.filter(r => r.id !== repoId));
+      // Clear ref if we deleted the art repo
+      if (repoId === artRepoIdRef.current) {
+          artRepoIdRef.current = null;
+      }
   }
 
   const handleAddFile = async (repoId: string, filename: string) => {
@@ -154,18 +170,27 @@ function App() {
   const handlePixelArt = async (date: string) => {
       if (!secretKey) return;
 
-      // 1. Find or Create 'contribution-art' repo
-      let targetRepo = repos.find(r => r.name === 'contribution-art');
-      let targetRepoId = targetRepo?.id;
+      // 1. Resolve Target Repo ID
+      // We use a Ref here because this function is called in a loop (stamp mode)
+      // inside ContributionGraph. The closure of this function might have a stale 'repos' state
+      // if it was captured before the first repo creation finished.
+      // The Ref ensures we always see the ID created in the previous iteration of the loop.
+      let targetRepoId = artRepoIdRef.current || repos.find(r => r.name === 'contribution-art')?.id;
 
       if (!targetRepoId) {
-          // Create hidden repo for art
-          const newRepo = await api.createRepo(secretKey, 'contribution-art', 'Automated repository for contribution graph pixel art.', true);
-          if (newRepo) {
-              targetRepoId = newRepo.id;
-              setRepos(prev => [newRepo, ...prev]);
-          } else {
-              alert("Failed to initialize Pixel Art Module.");
+          try {
+              // Create hidden repo for art
+              const newRepo = await api.createRepo(secretKey, 'contribution-art', 'Automated repository for contribution graph pixel art.', true);
+              if (newRepo) {
+                  targetRepoId = newRepo.id;
+                  artRepoIdRef.current = newRepo.id; // CRITICAL: Update Ref immediately
+                  setRepos(prev => [newRepo, ...prev]);
+              } else {
+                  console.error("Failed to initialize Pixel Art Module.");
+                  return;
+              }
+          } catch (e) {
+              console.error("Repo creation failed", e);
               return;
           }
       }

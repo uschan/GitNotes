@@ -103,7 +103,7 @@ npm run dev
 
 ## 📜 License
 
-**MIT License**. Designed by **WildSaltLab**.
+**MIT License**. Designed by **WildSaltLab.com**.
 Free to fork, modify, and deploy for your own personal knowledge base.
 
 ---
