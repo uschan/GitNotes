@@ -22,8 +22,10 @@
                 surface: '#0F0F11',  // Surface
                 border: '#27272A',   // Zinc-800
                 light: '#3F3F46',    // Zinc-700
-                orange: '#FF4D00',   // International Orange
-                green: '#00E676',    // Signal Green
+                // Dynamic Primary Color (Defaults to Orange, overridden by CSS vars)
+                // Using rgb() syntax allows Tailwind opacity modifiers to work: bg-zenith-orange/20
+                orange: 'rgb(var(--color-primary-rgb) / <alpha-value>)', 
+                green: '#00E676',    // Signal Green (Static Success Color)
                 text: '#E4E4E7',     // Zinc-200
                 muted: '#52525B',    // Zinc-600
               }
@@ -47,6 +49,21 @@
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
+      :root {
+        /* Default: International Orange #FF4D00 */
+        --color-primary-rgb: 255 77 0; 
+      }
+      
+      /* Theme: Matrix Green #00FF94 */
+      [data-theme="green"] {
+        --color-primary-rgb: 0 255 148; 
+      }
+
+      /* Theme: Holo Blue #38BDF8 */
+      [data-theme="blue"] {
+        --color-primary-rgb: 56 189 248; 
+      }
+
       body {
         background-color: #030303;
         color: #E4E4E7;
@@ -67,7 +84,7 @@
         border-radius: 0px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #FF4D00;
+        background: rgb(var(--color-primary-rgb));
       }
 
       /* Utility for Cut Corners */

@@ -11,10 +11,23 @@ import { api } from './services/dataService';
 import { Repository } from './types';
 import { Icons } from './components/Icon';
 
+type Theme = 'orange' | 'green' | 'blue';
+
 function App() {
   const [repos, setRepos] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(false);
   const [secretKey, setSecretKey] = useState<string | null>(null);
+  
+  // Theme State
+  const [theme, setTheme] = useState<Theme>(() => {
+      return (localStorage.getItem('gitnotes_theme') as Theme) || 'orange';
+  });
+
+  // Apply Theme
+  useEffect(() => {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('gitnotes_theme', theme);
+  }, [theme]);
   
   // New Modals
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -227,8 +240,27 @@ function App() {
           />
         </Routes>
 
-        <footer className="mt-20 py-12 border-t border-zenith-border flex flex-col items-center gap-8 bg-zenith-bg/50">
+        <footer className="mt-20 py-12 border-t border-zenith-border flex flex-col items-center gap-6 bg-zenith-bg/50">
             <SocialBar />
+
+            {/* Theme Switcher */}
+            <div className="flex items-center gap-4 bg-zenith-surface border border-zenith-border rounded-full px-4 py-2">
+                <button 
+                    onClick={() => setTheme('orange')} 
+                    className={`w-3 h-3 rounded-full bg-[#FF4D00] transition-all duration-300 ${theme === 'orange' ? 'ring-2 ring-white scale-110 shadow-[0_0_10px_#FF4D00]' : 'opacity-40 hover:opacity-100 hover:scale-110'}`}
+                    title="Zenith Orange"
+                ></button>
+                <button 
+                    onClick={() => setTheme('green')} 
+                    className={`w-3 h-3 rounded-full bg-[#00FF94] transition-all duration-300 ${theme === 'green' ? 'ring-2 ring-white scale-110 shadow-[0_0_10px_#00FF94]' : 'opacity-40 hover:opacity-100 hover:scale-110'}`}
+                    title="Matrix Green"
+                ></button>
+                <button 
+                    onClick={() => setTheme('blue')} 
+                    className={`w-3 h-3 rounded-full bg-[#38BDF8] transition-all duration-300 ${theme === 'blue' ? 'ring-2 ring-white scale-110 shadow-[0_0_10px_#38BDF8]' : 'opacity-40 hover:opacity-100 hover:scale-110'}`}
+                    title="Holo Blue"
+                ></button>
+            </div>
             
             <div className="text-[10px] tracking-widest text-zenith-muted font-mono uppercase flex items-center gap-4 opacity-60 hover:opacity-100 transition-opacity">
                 <span className="text-zenith-green">WildSalt.Lab</span>
