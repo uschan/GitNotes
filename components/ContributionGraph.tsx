@@ -90,6 +90,12 @@ const ContributionGraph: React.FC<ContributionGraphProps> = ({ repos, onDrawPixe
   const [daysToGenerate, setDaysToGenerate] = useState(364);
   const [isPixelMode, setIsPixelMode] = useState(false);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
+  
+  // Touch Support: Anchor Date
+  // On touch/click, we lock the preview to this date. 
+  // Clicking the SAME date again triggers the action.
+  const [previewAnchorDate, setPreviewAnchorDate] = useState<string | null>(null);
+
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [isStamping, setIsStamping] = useState(false);
 
@@ -183,16 +189,23 @@ const ContributionGraph: React.FC<ContributionGraphProps> = ({ repos, onDrawPixe
       if (!isPixelMode || !onDrawPixel || isStamping) return;
 
       if (selectedTemplate) {
-          // Stamp Mode
-          const indicesToStamp = getStampPreview(date);
-          if (indicesToStamp.length === 0) return;
+          // PATTERN MODE: Two-Step Verification (Touch Friendly)
           
-          // Trigger Custom Modal
-          setPendingStampData({ indices: indicesToStamp, template: selectedTemplate });
-          setIsConfirmOpen(true);
+          if (previewAnchorDate === date) {
+              // 2. Second Click: EXECUTE
+              const indicesToStamp = getStampPreview(date);
+              if (indicesToStamp.length === 0) return;
+              
+              setPendingStampData({ indices: indicesToStamp, template: selectedTemplate });
+              setIsConfirmOpen(true);
+              // Note: We don't clear previewAnchorDate yet, we wait for confirm or cancel
+          } else {
+              // 1. First Click: TARGET LOCK (Preview)
+              setPreviewAnchorDate(date);
+          }
 
       } else {
-          // Single Pixel Mode
+          // SINGLE PIXEL MODE: Direct Execute
           await onDrawPixel(date);
       }
   };
@@ -202,7 +215,6 @@ const ContributionGraph: React.FC<ContributionGraphProps> = ({ repos, onDrawPixe
       
       setIsStamping(true);
       try {
-         // Sequential execution to avoid rate limits or browser hanging
          for (const idx of pendingStampData.indices) {
              const item = weeks[idx];
              if (item && item.date) {
@@ -216,14 +228,19 @@ const ContributionGraph: React.FC<ContributionGraphProps> = ({ repos, onDrawPixe
           setIsStamping(false);
           setSelectedTemplate(null); 
           setPendingStampData(null);
+          setPreviewAnchorDate(null);
       }
   };
 
-  // Preview Logic
+  // Preview Logic: Prioritize Anchor Date (Clicked) over Hover Date (Mouseover)
   const previewIndices = useMemo(() => {
-      if (!isPixelMode || !selectedTemplate || !hoverDate) return new Set<number>();
-      return new Set(getStampPreview(hoverDate));
-  }, [isPixelMode, selectedTemplate, hoverDate, dateMap]);
+      if (!isPixelMode || !selectedTemplate) return new Set<number>();
+      
+      const targetDate = previewAnchorDate || hoverDate;
+      if (!targetDate) return new Set<number>();
+
+      return new Set(getStampPreview(targetDate));
+  }, [isPixelMode, selectedTemplate, hoverDate, previewAnchorDate, dateMap]);
 
   return (
     <>
@@ -239,17 +256,27 @@ const ContributionGraph: React.FC<ContributionGraphProps> = ({ repos, onDrawPixe
                 <div>
                     <div className="flex items-center gap-2 mb-1">
                         <div className={`w-1.5 h-1.5 rounded-full ${isPixelMode ? 'bg-zenith-orange animate-ping' : 'bg-zenith-orange animate-pulse'}`}></div>
-                        <div className="font-mono text-[10px] text-zenith-muted tracking-widest uppercase">
+                        <div className="font-mono text-[10px] text-zenith-muted tracking-widest uppercase flex items-center gap-2">
                             {isPixelMode ? (isStamping ? 'STAMPING SEQUENCE...' : 'PIXEL ART // EDIT MODE') : 'Activity Matrix'}
+                            
+                            {/* Visual Feedback for Touch Interaction */}
+                            {isPixelMode && selectedTemplate && !isStamping && (
+                                <span className={`${previewAnchorDate ? 'text-zenith-green' : 'text-zenith-muted'} hidden sm:inline-block`}>
+                                    {previewAnchorDate ? `>> TARGET LOCKED: ${previewAnchorDate}` : '>> SELECT TARGET COORDINATES'}
+                                </span>
+                            )}
                         </div>
                     </div>
                     <div className="text-white font-bold font-mono text-sm uppercase tracking-tight flex items-center gap-4">
                         {isPixelMode && !isStamping ? (
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 flex-wrap">
                                 {Object.keys(PATTERNS).map(key => (
                                     <button
                                         key={key}
-                                        onClick={() => setSelectedTemplate(selectedTemplate === key ? null : key)}
+                                        onClick={() => {
+                                            setSelectedTemplate(selectedTemplate === key ? null : key);
+                                            setPreviewAnchorDate(null); // Reset anchor on template change
+                                        }}
                                         className={`text-[10px] px-2 py-0.5 border transition-colors ${selectedTemplate === key ? 'bg-zenith-orange text-black border-zenith-orange' : 'border-zenith-border text-zenith-muted hover:text-white'}`}
                                     >
                                         {key}
@@ -270,6 +297,7 @@ const ContributionGraph: React.FC<ContributionGraphProps> = ({ repos, onDrawPixe
                             onClick={() => {
                                 setIsPixelMode(!isPixelMode);
                                 setSelectedTemplate(null);
+                                setPreviewAnchorDate(null);
                             }}
                             className={`text-[10px] font-mono font-bold uppercase px-3 py-1.5 border transition-all ${isPixelMode ? 'bg-zenith-orange text-black border-zenith-orange' : 'border-zenith-border text-zenith-muted hover:text-white hover:border-white'} ${isStamping ? 'opacity-50 cursor-wait' : ''}`}
                         >
@@ -292,6 +320,13 @@ const ContributionGraph: React.FC<ContributionGraphProps> = ({ repos, onDrawPixe
                     )}
                 </div>
             </div>
+            
+            {/* Instruction Banner for Touch Devices */}
+            {isPixelMode && selectedTemplate && !isStamping && (
+                <div className="px-6 pb-2 text-[10px] font-mono text-zenith-orange uppercase tracking-wider animate-pulse md:hidden">
+                    {previewAnchorDate ? "TAP AGAIN TO CONFIRM DEPLOYMENT" : "TAP TO PREVIEW PATTERN"}
+                </div>
+            )}
 
             {/* The Grid */}
             <div className="overflow-x-auto pb-6 px-6 scrollbar-hide relative z-10">
@@ -302,6 +337,8 @@ const ContributionGraph: React.FC<ContributionGraphProps> = ({ repos, onDrawPixe
                         }
                         
                         const isPreview = previewIndices.has(idx);
+                        // Highlight the exact clicked anchor point differently
+                        const isAnchor = day.date === previewAnchorDate;
 
                         return (
                             <div 
@@ -309,10 +346,11 @@ const ContributionGraph: React.FC<ContributionGraphProps> = ({ repos, onDrawPixe
                                 onClick={() => handleCellClick(day.date)}
                                 onMouseEnter={() => setHoverDate(day.date)}
                                 onMouseLeave={() => setHoverDate(null)}
-                                title={isPixelMode ? (selectedTemplate ? `Stamp ${selectedTemplate}` : `Draw Pixel ${day.date}`) : `${day.count} updates`}
+                                title={isPixelMode ? (selectedTemplate ? (isAnchor ? "Click again to confirm" : `Preview ${selectedTemplate}`) : `Draw Pixel ${day.date}`) : `${day.count} updates`}
                                 className={`w-2.5 h-2.5 rounded-[1px] transition-all duration-100 border border-transparent 
                                     ${isPixelMode && !isStamping ? 'cursor-pointer' : ''}
-                                    ${isPreview ? 'bg-zenith-orange animate-pulse scale-110 z-10 shadow-[0_0_5px_#FF4D00]' : ''}
+                                    ${isPreview ? 'bg-zenith-orange animate-pulse z-10' : ''}
+                                    ${isPreview && isAnchor ? 'ring-2 ring-white ring-opacity-50 scale-125' : isPreview ? 'scale-110 shadow-[0_0_5px_#FF4D00]' : ''}
                                     ${
                                     !isPreview && day.intensity === 0 ? 'bg-zenith-border/20' : 
                                     !isPreview && day.intensity === 1 ? 'bg-zenith-orange/20' :
@@ -336,10 +374,13 @@ const ContributionGraph: React.FC<ContributionGraphProps> = ({ repos, onDrawPixe
 
         <ActionConfirmModal 
             isOpen={isConfirmOpen}
-            onClose={() => setIsConfirmOpen(false)}
+            onClose={() => {
+                setIsConfirmOpen(false);
+                // We keep previewAnchorDate set if they cancel, so they can try again easily
+            }}
             onConfirm={executeStamp}
             title="PATTERN DEPLOYMENT"
-            description={`Initialize automated commit sequence for pattern "${pendingStampData?.template}"? This will generate ${pendingStampData?.indices.length} contribution points and overwrite any existing data in the target sector.`}
+            description={`Initialize automated commit sequence for pattern "${pendingStampData?.template}"? Target Date: ${previewAnchorDate}. This will generate ${pendingStampData?.indices.length} contribution points.`}
             confirmText="INITIATE"
         />
     </>
