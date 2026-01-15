@@ -76,7 +76,7 @@ const AccessGate: React.FC<AccessGateProps> = ({ onUnlock }) => {
                 
                 {/* Hero Typography */}
                 <div className="space-y-6">
-                    <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-white leading-none">
+                    <h1 className="text-4xl md:text-8xl font-black tracking-tighter text-white leading-none">
                         GIT<span className="text-zenith-orange">NOTES</span>
                     </h1>
                     <p className="text-lg md:text-xl text-zenith-muted font-mono max-w-2xl mx-auto leading-relaxed">
@@ -86,21 +86,21 @@ const AccessGate: React.FC<AccessGateProps> = ({ onUnlock }) => {
                 </div>
 
                 {/* Feature Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left max-w-3xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left max-w-4xl mx-auto">
                     <div className="bg-zenith-surface/50 border border-zenith-border p-5 hover:border-zenith-orange/50 transition-colors group">
                         <Icons.Database className="text-zenith-muted group-hover:text-zenith-orange mb-3" size={24} />
                         <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-2">Edge Persistence</h3>
-                        <p className="text-zenith-muted text-xs leading-5">Zero maintenance. Powered by Vercel & Supabase for infinite scale and zero cost.</p>
+                        <p className="text-zenith-muted text-base leading-5">Zero maintenance. Powered by Vercel & Supabase for infinite scale and zero cost.</p>
                     </div>
                     <div className="bg-zenith-surface/50 border border-zenith-border p-5 hover:border-zenith-orange/50 transition-colors group">
                         <Icons.Lock className="text-zenith-muted group-hover:text-zenith-orange mb-3" size={24} />
                         <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-2">Anonymous Auth</h3>
-                        <p className="text-zenith-muted text-xs leading-5">No emails. No passwords. Identify via a unique cryptographically generated key.</p>
+                        <p className="text-zenith-muted text-base leading-5">No emails. No passwords. Identify via a unique cryptographically generated key.</p>
                     </div>
                     <div className="bg-zenith-surface/50 border border-zenith-border p-5 hover:border-zenith-orange/50 transition-colors group">
                         <Icons.Zap className="text-zenith-muted group-hover:text-zenith-orange mb-3" size={24} />
                         <h3 className="text-white font-bold text-sm uppercase tracking-wider mb-2">Time Travel</h3>
-                        <p className="text-zenith-muted text-xs leading-5">Hack your contribution graph. Leave pixel art in your commit history.</p>
+                        <p className="text-zenith-muted text-base leading-5">Hack your contribution graph. Leave pixel art in your commit history.</p>
                     </div>
                 </div>
 
@@ -214,7 +214,7 @@ const AccessGate: React.FC<AccessGateProps> = ({ onUnlock }) => {
       <footer className="relative z-10 p-6 flex justify-between items-end pointer-events-none">
           <div className="flex flex-col gap-1">
              <div className="w-px h-12 bg-zenith-border"></div>
-             <span className="font-mono text-[10px] text-zenith-muted uppercase tracking-widest">Designed by WildSalt</span>
+             <span className="font-mono text-[10px] text-zenith-muted uppercase tracking-widest">Designed by WildSalt.Lab</span>
           </div>
           <div className="flex gap-2">
              {!isSupabaseConfigured && (
