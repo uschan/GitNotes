@@ -166,9 +166,25 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
                 }
             });
 
-            const markdown = turndownService.turndown(html);
+            let markdown = turndownService.turndown(html);
             
-            setConversionStatus("SMART PASTE: TEXT ONLY");
+            // --- DATA CLEANUP PIPELINE ---
+            // 1. Unescape common markdown structures at start of line
+            markdown = markdown.replace(/^\\(#+)/gm, '$1'); // \# -> #
+            markdown = markdown.replace(/^\\>/gm, '>');     // \> -> >
+            markdown = markdown.replace(/^\\([-*+])/gm, '$1'); // \- -> -
+            
+            // 2. Unescape specific patterns
+            markdown = markdown.replace(/^(\\\*){3,}$/gm, '***'); // \*\*\* -> ***
+            markdown = markdown.replace(/\\([\[\]])/g, '$1');     // \[Link\] -> [Link]
+            
+            // 3. Remove artifacts
+            markdown = markdown.replace(/↩︎/g, ''); // Remove footnote returns
+
+            // 4. Normalize Whitespace (Collapse 3+ newlines to 2)
+            markdown = markdown.replace(/\n{3,}/g, '\n\n');
+
+            setConversionStatus("SMART PASTE: CLEANED");
             setTimeout(() => setConversionStatus(null), 3000);
 
             insertTextAtCursor(markdown);
