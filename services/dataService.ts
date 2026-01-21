@@ -95,15 +95,34 @@ const localProvider = {
     };
 
     repos[repoIndex].files.unshift(newFile);
-    // Also update repo timestamp to match the latest file if it's newer, 
-    // but for pixel art (backdating), we usually don't want to bring the repo to the top of the list if it's old.
-    // However, simplicity sake, we update repo timestamp if it's a current action.
+    
     if (!customDate) {
         repos[repoIndex].updatedAt = timestamp;
     }
     
     localProvider.saveData(repos);
     return newFile;
+  },
+
+  renameFile: async (repoId: string, fileId: string, newName: string) => {
+      const repos = localProvider.getData();
+      let found = false;
+      const updatedRepos = repos.map(repo => {
+          if (repo.id === repoId) {
+              const fileIndex = repo.files.findIndex(f => f.id === fileId);
+              if (fileIndex !== -1) {
+                  repo.files[fileIndex] = {
+                      ...repo.files[fileIndex],
+                      name: newName,
+                      updatedAt: new Date().toISOString()
+                  };
+                  repo.updatedAt = new Date().toISOString();
+                  found = true;
+              }
+          }
+          return repo;
+      });
+      if (found) localProvider.saveData(updatedRepos);
   },
 
   updateFile: async (fileId: string, content: string) => {
@@ -187,7 +206,7 @@ export const api = {
     const { error } = await client
       .from('repositories')
       .update({ name, description, updated_at: new Date().toISOString() })
-      .eq('id', repoId); // RLS will implicitly check owner_id via header
+      .eq('id', repoId);
     if (error) throw error;
   },
 
@@ -221,13 +240,23 @@ export const api = {
 
     if (error) throw error;
     
-    // We only update the repo's 'updated_at' if this is a NEW file (now), 
-    // we don't want backdated pixel art to bring the repo to the top of the list in the dashboard
     if (!customDate) {
         await client.from('repositories').update({ updated_at: new Date().toISOString() }).eq('id', repoId);
     }
     
     return mapFile(data);
+  },
+
+  renameFile: async (secretKey: string, repoId: string, fileId: string, newName: string) => {
+      const client = getAuthenticatedClient(secretKey);
+      if (!client) return localProvider.renameFile(repoId, fileId, newName);
+
+      const { error } = await client
+        .from('files')
+        .update({ name: newName, updated_at: new Date().toISOString() })
+        .eq('id', fileId);
+      
+      if (error) throw error;
   },
 
   updateFile: async (secretKey: string, fileId: string, content: string) => {

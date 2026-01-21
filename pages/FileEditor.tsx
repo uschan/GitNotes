@@ -16,6 +16,7 @@ import { gfm } from 'turndown-plugin-gfm';
 interface FileEditorProps {
   repos: Repository[];
   onUpdateFile: (repoId: string, fileId: string, newContent: string) => void;
+  onRenameFile: (repoId: string, fileId: string, newName: string) => void;
   onDeleteFile: (repoId: string, fileId: string) => void;
   isAuthenticated: boolean;
 }
@@ -36,7 +37,7 @@ interface Backlink {
   context: string;
 }
 
-const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFile, isAuthenticated }) => {
+const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFile, onDeleteFile, isAuthenticated }) => {
   const { repoId, fileId } = useParams<{ repoId: string; fileId: string }>();
   const navigate = useNavigate();
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -51,9 +52,14 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
   const [conversionStatus, setConversionStatus] = useState<string | null>(null);
   const [isLinkSelectorOpen, setIsLinkSelectorOpen] = useState(false);
 
+  // Renaming State
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
+
   useEffect(() => {
     if (file) {
       setContent(file.content);
+      setRenameValue(file.name);
     }
   }, [file]);
 
@@ -134,6 +140,19 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
     setHasChanges(false);
   };
 
+  const handleRenameSubmit = () => {
+    if (!isAuthenticated) return;
+    if (renameValue.trim() && renameValue.trim() !== file.name) {
+        let name = renameValue.trim();
+        if (!name.endsWith('.md')) name += '.md';
+        onRenameFile(repoId!, fileId!, name);
+        // Show Feedback
+        setConversionStatus("REFACTORING LINKS...");
+        setTimeout(() => setConversionStatus(null), 2000);
+    }
+    setIsRenaming(false);
+  };
+
   const handleContentChange = (val: string) => {
       setContent(val);
       setHasChanges(val !== file.content);
@@ -205,7 +224,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
              // Remove '[[' and insert link
              const before = val.substring(0, end - 2);
              const after = val.substring(end);
-             const linkMd = `[${targetName.replace('.md', '')}](/${targetRepoId}/${targetFileId})`;
+             const linkMd = `[[${targetName.replace('.md', '')}]]`; // Using WikiLink Style preference based on user behavior
              const newText = before + linkMd + after;
              setContent(newText);
              setHasChanges(true);
@@ -221,7 +240,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
       }
 
       // Normal insertion via button
-      const linkMd = `[${targetName.replace('.md', '')}](/${targetRepoId}/${targetFileId})`;
+      const linkMd = `[[${targetName.replace('.md', '')}]]`;
       insertTextAtCursor(linkMd);
   };
 
@@ -356,7 +375,27 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onDeleteFi
                   <Icons.ChevronRight className="rotate-180" size={18} />
               </Link>
               <div className="h-6 w-px bg-zenith-border shrink-0"></div>
-              <span className="font-mono text-sm text-white font-bold tracking-wide truncate" title={file.name}>{file.name}</span>
+              
+              {/* Renaming Interface */}
+              {isRenaming && isAuthenticated ? (
+                  <input 
+                    autoFocus
+                    type="text"
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={handleRenameSubmit}
+                    onKeyDown={(e) => e.key === 'Enter' && handleRenameSubmit()}
+                    className="bg-black border border-zenith-orange text-white font-mono text-sm font-bold tracking-wide px-2 py-1 outline-none min-w-[200px]"
+                  />
+              ) : (
+                  <div className="flex items-center gap-2 group cursor-pointer" onClick={() => isAuthenticated && setIsRenaming(true)}>
+                    <span className="font-mono text-sm text-white font-bold tracking-wide truncate group-hover:text-zenith-orange transition-colors" title={file.name}>
+                        {file.name}
+                    </span>
+                    {isAuthenticated && <Icons.Edit size={12} className="text-zenith-border group-hover:text-zenith-orange opacity-0 group-hover:opacity-100 transition-all"/>}
+                  </div>
+              )}
+
               {hasChanges && <span className="text-[10px] bg-zenith-orange text-black px-2 py-0.5 font-bold font-mono shrink-0">UNSAVED</span>}
               {!isAuthenticated && <span className="text-[10px] border border-zenith-border text-zenith-muted px-2 py-0.5 font-mono uppercase shrink-0 hidden sm:block">Read Only</span>}
           </div>

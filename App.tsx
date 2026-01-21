@@ -155,6 +155,52 @@ function App() {
     }));
   };
 
+  const handleRenameFile = async (repoId: string, fileId: string, newName: string) => {
+      if (!secretKey) return;
+      
+      const repo = repos.find(r => r.id === repoId);
+      const file = repo?.files.find(f => f.id === fileId);
+      
+      if (!repo || !file) return;
+
+      const oldName = file.name;
+      const oldLinkName = oldName.replace('.md', '');
+      const newLinkName = newName.replace('.md', '');
+
+      // 1. Rename the file itself
+      await api.renameFile(secretKey, repoId, fileId, newName);
+
+      // 2. REFACTORING PROTOCOL: Update all other files in the same repo
+      // Regex to find [[OldName]] or [[OldName.md]]
+      // We escape the old name to prevent regex errors
+      const escapeRegExp = (string: string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+      const linkRegex = new RegExp(`\\[\\[${escapeRegExp(oldLinkName)}(?:\\.md)?\\]\\]`, 'g');
+
+      // Optimistically update state
+      setRepos(prev => prev.map(r => {
+          if (r.id === repoId) {
+             const updatedFiles = r.files.map(f => {
+                 // Rename the target file
+                 if (f.id === fileId) {
+                     return { ...f, name: newName, updatedAt: new Date().toISOString() };
+                 }
+                 
+                 // Refactor links in other files
+                 if (linkRegex.test(f.content)) {
+                     const newContent = f.content.replace(linkRegex, `[[${newLinkName}]]`);
+                     // Fire and forget update for these files to backend
+                     api.updateFile(secretKey, f.id, newContent); 
+                     return { ...f, content: newContent, updatedAt: new Date().toISOString() };
+                 }
+
+                 return f;
+             });
+             return { ...r, files: updatedFiles, updatedAt: new Date().toISOString() };
+          }
+          return r;
+      }));
+  };
+
   const handleDeleteFile = async (repoId: string, fileId: string) => {
       if (!secretKey) return;
       await api.deleteFile(secretKey, fileId);
@@ -248,7 +294,8 @@ function App() {
                     onAddFile={handleAddFile}
                     onDeleteRepo={handleDeleteRepo}
                     onUpdateRepo={handleUpdateRepo}
-                    isAuthenticated={true} // Always true once Key entered
+                    onUpdateFile={handleUpdateFile}
+                    isAuthenticated={true} 
                 />
             } 
           />
@@ -257,7 +304,8 @@ function App() {
             element={
                 <FileEditor 
                     repos={repos} 
-                    onUpdateFile={handleUpdateFile} 
+                    onUpdateFile={handleUpdateFile}
+                    onRenameFile={handleRenameFile} 
                     onDeleteFile={handleDeleteFile}
                     isAuthenticated={true}
                 />

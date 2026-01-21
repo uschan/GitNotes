@@ -39,7 +39,8 @@ import {
   Instagram,
   Twitter,
   Globe,
-  RefreshCw
+  RefreshCw,
+  Network
 } from 'lucide-react';
 
 export const Icons = {
@@ -82,5 +83,6 @@ export const Icons = {
   Instagram,
   Twitter,
   Globe,
-  RefreshCw
+  RefreshCw,
+  Network
 };
