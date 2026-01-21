@@ -26,6 +26,16 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
   
   // View State: 'list' or 'graph'
   const [viewMode, setViewMode] = useState<'list' | 'graph'>('list');
+  
+  // Graph Scope: 'local' or 'global' - Persisted preference
+  const [graphScope, setGraphScopeState] = useState<'local' | 'global'>(() => {
+      return (localStorage.getItem('gitnotes_graph_scope') as 'local' | 'global') || 'local';
+  });
+
+  const setGraphScope = (scope: 'local' | 'global') => {
+      setGraphScopeState(scope);
+      localStorage.setItem('gitnotes_graph_scope', scope);
+  };
 
   // Modal states
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -54,15 +64,34 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
   const handleConnectNodes = (sourceId: string, targetId: string) => {
       if (!isAuthenticated) return;
       
-      const sourceFile = repo.files.find(f => f.id === sourceId);
-      const targetFile = repo.files.find(f => f.id === targetId);
+      // Find files across ALL repos if global, or just local if local logic (though helper keeps it simple)
+      let sourceFile = repo.files.find(f => f.id === sourceId);
+      let targetFile = repo.files.find(f => f.id === targetId);
+      let targetRepoId = repo.id;
+
+      // Global Search for node connection
+      if (!sourceFile || !targetFile) {
+          repos.forEach(r => {
+              const s = r.files.find(f => f.id === sourceId);
+              if (s) sourceFile = s;
+              const t = r.files.find(f => f.id === targetId);
+              if (t) {
+                  targetFile = t;
+                  targetRepoId = r.id;
+              }
+          });
+      }
 
       if (sourceFile && targetFile) {
           const linkName = targetFile.name.replace('.md', '');
           // Check if link already exists to prevent duplication
           if (!sourceFile.content.includes(`[[${linkName}]]`)) {
              const newContent = sourceFile.content + `\n\nRelated: [[${linkName}]]`;
-             onUpdateFile(repo.id, sourceId, newContent);
+             // We need to find the repo ID of the SOURCE file to update it
+             const sourceRepo = repos.find(r => r.files.some(f => f.id === sourceId));
+             if (sourceRepo) {
+                 onUpdateFile(sourceRepo.id, sourceId, newContent);
+             }
           }
       }
   };
@@ -70,8 +99,18 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
   const handleDisconnectNodes = (sourceId: string, targetId: string) => {
       if (!isAuthenticated) return;
 
-      const sourceFile = repo.files.find(f => f.id === sourceId);
-      const targetFile = repo.files.find(f => f.id === targetId);
+      let sourceFile = repo.files.find(f => f.id === sourceId);
+      let targetFile = repo.files.find(f => f.id === targetId);
+
+      // Global Search
+      if (!sourceFile || !targetFile) {
+          repos.forEach(r => {
+              const s = r.files.find(f => f.id === sourceId);
+              if (s) sourceFile = s;
+              const t = r.files.find(f => f.id === targetId);
+              if (t) targetFile = t;
+          });
+      }
 
       if (sourceFile && targetFile) {
           const linkName = targetFile.name.replace('.md', '');
@@ -79,41 +118,26 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
           
           const lines = sourceFile.content.split('\n');
           const newLines = lines.filter(line => {
-              // 1. Check if line contains the link at all
               const linkRegex = new RegExp(`\\[\\[${escapedLinkName}(?:\\.md)?\\]\\]`, 'i');
               if (!linkRegex.test(line)) return true;
-
-              // 2. SMART REMOVAL LOGIC
-              
-              // Case A: List Item (e.g., "- [[Link]] - Description" or "1. [[Link]]")
-              // Regex matches: Start of line -> optional whitespace -> list marker -> whitespace -> [[Link]] -> anything else
               const listItemRegex = new RegExp(`^\\s*(?:[-*+]|\\d+\\.)\\s*\\[\\[${escapedLinkName}(?:\\.md)?\\]\\].*$`, 'i');
-              if (listItemRegex.test(line)) return false; // Remove entire line
-
-              // Case B: Key-Value / Property (e.g., "Related: [[Link]]")
+              if (listItemRegex.test(line)) return false; 
               const propRegex = new RegExp(`^\\s*(?:Related|Parent|Child|See|Source|Upstream|Ref)\\s*:?\\s*\\[\\[${escapedLinkName}(?:\\.md)?\\]\\].*$`, 'i');
-              if (propRegex.test(line)) return false; // Remove entire line
-              
-              // Case C: Just the link on a line by itself
+              if (propRegex.test(line)) return false; 
               if (line.trim() === `[[${linkName}]]` || line.trim() === `[[${linkName}.md]]`) return false;
-
-              // Case D: Embedded/Inline Link (e.g. "I learned about [[Link]] today")
-              // We KEEP the line, but we will strip the link syntax later in the map function.
               return true;
           }).map(line => {
-              // 3. CLEAN UP INLINE LINKS
-              // If the line survived the filter, it means it's an inline context.
-              // We downgrade "[[Link]]" to just "Link" to sever the graph connection but preserve text.
               const linkRegex = new RegExp(`\\[\\[(${escapedLinkName})(?:\\.md)?\\]\\]`, 'gi');
               return line.replace(linkRegex, '$1'); 
           });
 
           let newContent = newLines.join('\n');
-          
-          // Cleanup potential double newlines left by deleting lines
           newContent = newContent.replace(/\n{3,}/g, '\n\n').trim();
 
-          onUpdateFile(repo.id, sourceId, newContent);
+          const sourceRepo = repos.find(r => r.files.some(f => f.id === sourceId));
+          if (sourceRepo) {
+            onUpdateFile(sourceRepo.id, sourceId, newContent);
+          }
       }
   };
 
@@ -200,9 +224,28 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
 
       {/* Main Content Switcher */}
       {viewMode === 'graph' ? (
-          <div className="border border-zenith-border bg-zenith-surface/20 animate-in fade-in duration-500">
+          <div className="border border-zenith-border bg-zenith-surface/20 animate-in fade-in duration-500 relative">
+             
+             {/* Scope Toggle (Floating inside Graph) */}
+             <div className="absolute top-4 left-4 z-20 flex gap-2">
+                <button 
+                   onClick={() => setGraphScope('local')}
+                   className={`px-3 py-1 text-[10px] font-mono uppercase tracking-widest border transition-colors ${graphScope === 'local' ? 'bg-zenith-orange text-black border-zenith-orange' : 'bg-black text-zenith-muted border-zenith-border hover:border-white'}`}
+                >
+                   Local Sector
+                </button>
+                <button 
+                   onClick={() => setGraphScope('global')}
+                   className={`px-3 py-1 text-[10px] font-mono uppercase tracking-widest border transition-colors ${graphScope === 'global' ? 'bg-zenith-green text-black border-zenith-green' : 'bg-black text-zenith-muted border-zenith-border hover:border-white'}`}
+                >
+                   Galaxy View
+                </button>
+             </div>
+
              <GraphViewWrapper 
-                repo={repo} 
+                activeRepoId={repo.id}
+                repos={repos} // Pass ALL repos now
+                scope={graphScope}
                 onAddFile={() => setShowAddFile(true)}
                 onLinkNodes={handleConnectNodes}
                 onDisconnectNodes={handleDisconnectNodes}
