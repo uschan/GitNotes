@@ -40,7 +40,8 @@ import {
   Twitter,
   Globe,
   RefreshCw,
-  Network
+  Network,
+  HelpCircle
 } from 'lucide-react';
 
 export const Icons = {
@@ -84,5 +85,6 @@ export const Icons = {
   Twitter,
   Globe,
   RefreshCw,
-  Network
+  Network,
+  Help: HelpCircle
 };

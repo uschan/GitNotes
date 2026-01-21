@@ -61,7 +61,8 @@ const CustomDeleteEdge = ({
   const [isHovered, setIsHovered] = useState(false);
   
   // Clean Aesthetic: Default edge is strictly Neutral
-  const edgeColor = '#27272A'; // Zinc-800 - Very subtle
+  // We respect the style passed from the parent (which determines solid vs dashed)
+  const baseColor = style.stroke?.toString() || '#27272A';
   
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -86,23 +87,24 @@ const CustomDeleteEdge = ({
       ...style,
       stroke: '#ef4444', 
       strokeWidth: 2,
+      strokeDasharray: 'none', // Force solid on hover for clarity
       filter: 'drop-shadow(0 0 3px rgba(239, 68, 68, 0.6))',
       transition: 'all 0.3s ease',
       zIndex: 100
   };
 
-  // Normal State (Grey)
+  // Normal State
   const defaultStyle = {
       ...style,
-      stroke: edgeColor, 
+      // Stroke is handled by parent style (solid/dashed)
+      // We just ensure opacity and transitions here
       opacity: 0.8,
-      strokeWidth: 1,
       transition: 'all 0.3s ease',
   };
 
   return (
     <>
-      <BaseEdge path={edgePath} markerEnd={{...markerEndSafe, color: isHovered ? '#ef4444' : edgeColor} as any} style={isHovered ? activeStyle : defaultStyle} />
+      <BaseEdge path={edgePath} markerEnd={{...markerEndSafe, color: isHovered ? '#ef4444' : baseColor} as any} style={isHovered ? activeStyle : defaultStyle} />
       <EdgeLabelRenderer>
         <div
           style={{
@@ -122,7 +124,7 @@ const CustomDeleteEdge = ({
                 ? 'bg-red-600 text-white border-red-500 scale-110 opacity-100' 
                 : 'bg-black border-zenith-border opacity-0 group-hover:opacity-100 scale-90'
             }`}
-            style={{ color: isHovered ? 'white' : edgeColor }}
+            style={{ color: isHovered ? 'white' : baseColor }}
             onClick={(event) => onEdgeClick(event, id)}
             title="Sever Connection"
           >
@@ -139,6 +141,9 @@ const GraphView: React.FC<GraphViewProps> = ({ repo, onAddFile, onLinkNodes, onD
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView } = useReactFlow();
+  
+  // Legend State
+  const [showLegend, setShowLegend] = useState(false);
 
   const edgeTypes = useMemo(() => ({
     'custom-delete': CustomDeleteEdge,
@@ -186,70 +191,70 @@ const GraphView: React.FC<GraphViewProps> = ({ repo, onAddFile, onLinkNodes, onD
     return { nodes: layoutedNodes, edges };
   }, []);
 
-  // --- 2. SOVEREIGNTY ALGORITHM ---
+  // --- 2. SOVEREIGNTY & CONNECTION ALGORITHM ---
   useEffect(() => {
     if (!repo) return;
 
-    // A. Build Graph Data
+    // A. Init Data Structures
     const fileMap = new Map<string, string>();
     repo.files.forEach(f => fileMap.set(f.name, f.id));
     repo.files.forEach(f => fileMap.set(f.name.replace('.md', ''), f.id)); 
     const idToName = new Map<string, string>();
     repo.files.forEach(f => idToName.set(f.id, f.name.replace('.md', '')));
 
-    const adjacency = new Map<string, string[]>(); // Neighbors
+    const adjacency = new Map<string, string[]>(); // Neighbors for layout/clustering
     const degree = new Map<string, number>();
+    
+    // Registry to track directional links: "sourceId|targetId"
+    const connectionRegistry = new Set<string>();
+    // List to iterate for edge creation
+    const rawConnections: { source: string, target: string, targetName: string }[] = [];
 
     repo.files.forEach(f => {
         adjacency.set(f.id, []);
         degree.set(f.id, 0);
     });
 
-    const rawEdges: any[] = [];
+    // B. Parse Content & Build Link Registry
     repo.files.forEach(sourceFile => {
         const linkRegex = /\[\[(.*?)\]\]/g;
         let match;
+        // Use a set to avoid duplicate edges from the same file to the same target (e.g. multiple links)
+        const fileLinks = new Set<string>();
+
         while ((match = linkRegex.exec(sourceFile.content)) !== null) {
             const targetName = match[1];
             let targetId = fileMap.get(targetName);
             if (!targetId) targetId = fileMap.get(targetName + '.md');
 
             if (targetId && targetId !== sourceFile.id) {
-                // Undirected Adjacency for Clustering calculation
-                adjacency.get(sourceFile.id)?.push(targetId);
-                adjacency.get(targetId)?.push(sourceFile.id);
-                
-                // Increase degree (Popularity)
-                degree.set(sourceFile.id, (degree.get(sourceFile.id) || 0) + 1);
-                degree.set(targetId, (degree.get(targetId) || 0) + 1);
+                if (!fileLinks.has(targetId)) {
+                    fileLinks.add(targetId);
+                    
+                    // Register the directional link
+                    connectionRegistry.add(`${sourceFile.id}|${targetId}`);
+                    rawConnections.push({
+                        source: sourceFile.id,
+                        target: targetId,
+                        targetName: idToName.get(targetId) || targetName
+                    });
 
-                rawEdges.push({
-                    id: `${sourceFile.id}-${targetId}`,
-                    source: sourceFile.id,
-                    target: targetId,
-                    type: 'custom-delete', 
-                    animated: false,
-                    style: { strokeWidth: 1 }, 
-                    markerEnd: { type: MarkerType.ArrowClosed },
-                    data: {
-                        sourceName: sourceFile.name.replace('.md', ''),
-                        targetName: idToName.get(targetId) || targetName,
-                        onDelete: () => {
-                            if (onDisconnectNodes) onDisconnectNodes(sourceFile.id, targetId!);
-                        }
-                    },
-                });
+                    // Build Undirected stats for Clustering
+                    adjacency.get(sourceFile.id)?.push(targetId);
+                    adjacency.get(targetId)?.push(sourceFile.id);
+                    
+                    degree.set(sourceFile.id, (degree.get(sourceFile.id) || 0) + 1);
+                    degree.set(targetId, (degree.get(targetId) || 0) + 1);
+                }
             }
         }
     });
 
-    // B. Identify SOVEREIGNS (Mother Nodes)
-    // Rule: A Sovereign is a node that is a local maximum of connectivity (or manually significant like README)
-    // We sort all nodes by Degree.
+    // C. Identify SOVEREIGNS (Mother Nodes)
+    // Rule: A Sovereign is a node that is a local maximum of connectivity
     const sortedNodes = [...repo.files].sort((a, b) => {
         const degA = degree.get(a.id) || 0;
         const degB = degree.get(b.id) || 0;
-        // README is always Emperor
         if (a.name.toLowerCase() === 'readme.md') return -1;
         if (b.name.toLowerCase() === 'readme.md') return 1;
         return degB - degA; 
@@ -257,12 +262,9 @@ const GraphView: React.FC<GraphViewProps> = ({ repo, onAddFile, onLinkNodes, onD
 
     const sovereigns = new Set<string>();
     const nodeColorMap = new Map<string, string>();
-
-    // We pick the top N nodes as "Potential Sovereigns", but they must be somewhat distant from each other
-    // to avoid coloring a cluster with 5 different colors.
     let colorIdx = 0;
     
-    // First pass: README is always a sovereign
+    // 1. README
     const readme = repo.files.find(f => f.name.toLowerCase() === 'readme.md');
     if (readme) {
         sovereigns.add(readme.id);
@@ -270,17 +272,15 @@ const GraphView: React.FC<GraphViewProps> = ({ repo, onAddFile, onLinkNodes, onD
         colorIdx++;
     }
 
-    // Second pass: Find other dense hubs
+    // 2. Hubs
     sortedNodes.forEach(node => {
         if (sovereigns.has(node.id)) return;
         const myDegree = degree.get(node.id) || 0;
-        if (myDegree < 2) return; // Ignore weak nodes
+        if (myDegree < 2) return;
 
-        // Check if I am connected to an existing Sovereign?
         const neighbors = adjacency.get(node.id) || [];
         const connectedToSovereign = neighbors.some(n => sovereigns.has(n));
 
-        // If I am NOT connected to an existing Sovereign, I start a new Kingdom
         if (!connectedToSovereign) {
              sovereigns.add(node.id);
              nodeColorMap.set(node.id, CLUSTER_PALETTES[colorIdx % CLUSTER_PALETTES.length]);
@@ -288,38 +288,27 @@ const GraphView: React.FC<GraphViewProps> = ({ repo, onAddFile, onLinkNodes, onD
         }
     });
 
-    // C. Assign Subjects and Neutrals
-    // Iterate non-sovereign nodes.
+    // D. Assign Subjects and Neutrals
+    const NEUTRAL_COLOR = '#52525B';
     repo.files.forEach(node => {
         if (sovereigns.has(node.id)) return;
 
         const neighbors = adjacency.get(node.id) || [];
-        
-        // Find which Sovereigns this node is connected to (distance 1)
         const rulingSovereigns = new Set<string>();
         neighbors.forEach(n => {
             if (sovereigns.has(n)) rulingSovereigns.add(n);
-            // Also check neighbors of neighbors (distance 2) for gravity? 
-            // No, keep it simple. Direct connection matters most.
         });
 
         if (rulingSovereigns.size === 1) {
-            // EXCLUSIVE LOYALTY -> Inherit Color
             const kingId = Array.from(rulingSovereigns)[0];
             nodeColorMap.set(node.id, nodeColorMap.get(kingId)!);
-        } else if (rulingSovereigns.size > 1) {
-            // CONFLICT OF INTEREST -> NEUTRAL (Grey)
-            // This is the "Bridge" node.
-            nodeColorMap.set(node.id, '#52525B'); // Zinc-600
         } else {
-            // ORPHAN or Distant -> Neutral
-            nodeColorMap.set(node.id, '#52525B');
+            nodeColorMap.set(node.id, NEUTRAL_COLOR);
         }
     });
 
-    // D. Construct Visual Nodes
+    // E. Construct Visual Nodes
     const rawNodes: Node[] = [];
-    const NEUTRAL_COLOR = '#52525B';
 
     repo.files.forEach(file => {
         const isSovereign = sovereigns.has(file.id);
@@ -341,7 +330,7 @@ const GraphView: React.FC<GraphViewProps> = ({ repo, onAddFile, onLinkNodes, onD
 
         let style: React.CSSProperties = {
             background: '#030303',
-            color: isSovereign ? '#fff' : '#A1A1AA', // Sovereigns are White text, others Grey
+            color: isSovereign ? '#fff' : '#A1A1AA',
             border: `1px solid ${myColor}`,
             boxShadow: `0 4px 10px -2px rgba(0, 0, 0, 0.8)`,
             borderRadius: '2px',
@@ -359,10 +348,9 @@ const GraphView: React.FC<GraphViewProps> = ({ repo, onAddFile, onLinkNodes, onD
                 ...style,
                 borderWidth: '2px',
                 fontWeight: 'bold',
-                boxShadow: `0 0 15px ${myColor}30`, // Soft glow for Sovereigns
+                boxShadow: `0 0 15px ${myColor}30`,
             };
         } else if (isNeutral) {
-            // Bridge Nodes get dashed lines to signify "Connection/Transit"
             style = {
                 ...style,
                 borderStyle: 'dashed',
@@ -379,12 +367,39 @@ const GraphView: React.FC<GraphViewProps> = ({ repo, onAddFile, onLinkNodes, onD
         });
     });
 
-    // E. Edges are strictly neutral unless interacting
-    const finalEdges = rawEdges.map(edge => ({
-        ...edge,
-        style: { ...edge.style, stroke: '#27272A' }, 
-        markerEnd: { ...edge.markerEnd, color: '#27272A' }
-    }));
+    // F. Construct Visual Edges with Directionality Check
+    const finalEdges = rawConnections.map(conn => {
+        // Check Reciprocity
+        // Does target also link to source?
+        const isBiDirectional = connectionRegistry.has(`${conn.target}|${conn.source}`);
+        
+        return {
+            id: `${conn.source}-${conn.target}`,
+            source: conn.source,
+            target: conn.target,
+            type: 'custom-delete', 
+            animated: false,
+            // Styling Logic based on Directionality
+            style: { 
+                strokeWidth: 1,
+                // SOLID if Bi-Directional, DASHED if Uni-Directional
+                strokeDasharray: isBiDirectional ? 'none' : '4 4',
+                // Slightly darker for dashed to push them to background
+                stroke: isBiDirectional ? '#52525B' : '#27272A', 
+            }, 
+            markerEnd: { 
+                type: MarkerType.ArrowClosed,
+                color: isBiDirectional ? '#52525B' : '#27272A',
+            },
+            data: {
+                sourceName: idToName.get(conn.source),
+                targetName: conn.targetName,
+                onDelete: () => {
+                    if (onDisconnectNodes) onDisconnectNodes(conn.source, conn.target);
+                }
+            },
+        };
+    });
 
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rawNodes, finalEdges);
     setNodes(layoutedNodes);
@@ -420,12 +435,73 @@ const GraphView: React.FC<GraphViewProps> = ({ repo, onAddFile, onLinkNodes, onD
         {/* Graph Toolbar */}
         <div className="absolute top-4 right-4 z-10 flex gap-2">
             <button 
+                onClick={() => setShowLegend(!showLegend)}
+                className="bg-zenith-surface border border-zenith-border text-zenith-muted hover:text-white p-2 rounded-sm shadow-lg transition-colors"
+                title="Graph Legend"
+            >
+                <Icons.Help size={16} />
+            </button>
+            <div className="w-px h-8 bg-zenith-border/50 mx-1"></div>
+            <button 
                 onClick={onAddFile}
                 className="bg-zenith-orange text-black px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest hover:bg-white transition-colors shadow-lg flex items-center gap-2"
             >
                 <Icons.Plus size={14} /> Add Node
             </button>
         </div>
+
+        {/* Legend Modal/Overlay */}
+        {showLegend && (
+            <div className="absolute top-16 right-4 z-50 w-72 bg-black/90 backdrop-blur border border-zenith-border shadow-2xl p-4 animate-in fade-in slide-in-from-top-2">
+                <h4 className="font-mono text-[10px] text-zenith-muted uppercase tracking-widest mb-4 border-b border-zenith-border pb-2">
+                    Visual Taxonomy
+                </h4>
+                <div className="space-y-4">
+                    {/* Sovereign */}
+                    <div className="flex gap-3 items-start">
+                        <div className="w-4 h-4 rounded-sm border-2 border-zenith-orange shadow-[0_0_10px_rgba(255,77,0,0.3)] shrink-0 mt-0.5"></div>
+                        <div>
+                            <div className="text-white text-xs font-bold uppercase">Sovereign Node</div>
+                            <p className="text-[10px] text-zenith-muted leading-tight mt-1">A central topic or "Hub". Inherits a unique color based on its cluster.</p>
+                        </div>
+                    </div>
+                    {/* Subject */}
+                    <div className="flex gap-3 items-start">
+                        <div className="w-4 h-4 rounded-sm border border-zenith-orange shrink-0 mt-0.5 opacity-70"></div>
+                        <div>
+                            <div className="text-zenith-text text-xs font-bold uppercase">Subject Node</div>
+                            <p className="text-[10px] text-zenith-muted leading-tight mt-1">Exclusively linked to one Sovereign. Inherits the Sovereign's color.</p>
+                        </div>
+                    </div>
+                    {/* Neutral */}
+                    <div className="flex gap-3 items-start">
+                        <div className="w-4 h-4 rounded-sm border border-dashed border-zenith-muted shrink-0 mt-0.5"></div>
+                        <div>
+                            <div className="text-zenith-muted text-xs font-bold uppercase">Neutral / Bridge</div>
+                            <p className="text-[10px] text-zenith-muted leading-tight mt-1">Connects multiple Sovereigns. Remains grey to avoid color pollution.</p>
+                        </div>
+                    </div>
+                    
+                    <div className="h-px bg-zenith-border my-2"></div>
+
+                    {/* Edge Styles */}
+                    <div className="flex gap-3 items-center">
+                        <div className="w-8 h-0.5 bg-zenith-muted shrink-0"></div>
+                        <div>
+                            <div className="text-white text-xs font-bold uppercase">Solid Line</div>
+                            <p className="text-[10px] text-zenith-muted leading-tight">Bi-directional link (Strong bond).</p>
+                        </div>
+                    </div>
+                    <div className="flex gap-3 items-center">
+                        <div className="w-8 h-0.5 border-t border-dashed border-zenith-muted shrink-0"></div>
+                        <div>
+                            <div className="text-zenith-muted text-xs font-bold uppercase">Dashed Line</div>
+                            <p className="text-[10px] text-zenith-muted leading-tight">One-way reference (Weak link).</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {/* Empty State */}
         {nodes.length === 0 && (
@@ -477,7 +553,7 @@ const GraphView: React.FC<GraphViewProps> = ({ repo, onAddFile, onLinkNodes, onD
                 PROTOCOL: Sovereignty & Neutrality // {nodes.length} Nodes
             </div>
             <div className="font-mono text-[10px] text-zenith-muted mt-1">
-                Bridges are Neutral (Dashed). Sovereigns are Colored.
+                Solid lines = Mutual Links. Dashed = Single Reference.
             </div>
         </div>
     </div>
