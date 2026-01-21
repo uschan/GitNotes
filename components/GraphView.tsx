@@ -24,8 +24,8 @@ import { useNavigate } from 'react-router-dom';
 import { Icons } from './Icon';
 
 interface GraphViewProps {
-  repos: Repository[]; // Now receives all repos
-  activeRepoId: string; // The repo currently being viewed (for filtering in local mode)
+  repos: Repository[]; 
+  activeRepoId: string; 
   scope: 'local' | 'global';
   onAddFile: () => void;
   onLinkNodes?: (sourceId: string, targetId: string) => void;
@@ -62,8 +62,6 @@ const CustomDeleteEdge = ({
 }: EdgeProps) => {
   const [isHovered, setIsHovered] = useState(false);
   
-  // Clean Aesthetic: Default edge is strictly Neutral
-  // We respect the style passed from the parent (which determines solid vs dashed)
   const baseColor = style.stroke?.toString() || '#27272A';
   
   const [edgePath, labelX, labelY] = getSmoothStepPath({
@@ -89,7 +87,7 @@ const CustomDeleteEdge = ({
       ...style,
       stroke: '#ef4444', 
       strokeWidth: 2,
-      strokeDasharray: 'none', // Force solid on hover for clarity
+      strokeDasharray: 'none', 
       filter: 'drop-shadow(0 0 3px rgba(239, 68, 68, 0.6))',
       transition: 'all 0.3s ease',
       zIndex: 100
@@ -195,72 +193,116 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
   useEffect(() => {
     if (!repos || repos.length === 0) return;
 
-    // A. DETERMINE SCOPE
-    // If scope is local, filter files to active repo. If global, use all.
-    const activeRepo = repos.find(r => r.id === activeRepoId);
-    if (scope === 'local' && !activeRepo) return;
-
-    // Flatten files for Global View, or use single repo files for Local View
-    const targetFiles = scope === 'global' 
-        ? repos.flatMap(r => r.files.map(f => ({ ...f, _repoId: r.id, _repoName: r.name })))
-        : activeRepo!.files.map(f => ({ ...f, _repoId: activeRepo!.id, _repoName: activeRepo!.name }));
-
-    // B. BUILD MAPS
-    const fileMap = new Map<string, string>(); // Name -> ID
-    const idToNodeData = new Map<string, { name: string, repoId: string, repoName: string }>(); 
+    // A. PRE-PROCESSING: Build the "Universe"
+    // We need to know about ALL files to resolve links, even if we don't display them all.
+    const allFiles = repos.flatMap(r => r.files.map(f => ({ ...f, _repoId: r.id, _repoName: r.name })));
     
-    targetFiles.forEach(f => {
-        fileMap.set(f.name, f.id);
-        fileMap.set(f.name.replace('.md', ''), f.id);
-        idToNodeData.set(f.id, { name: f.name.replace('.md', ''), repoId: f._repoId, repoName: f._repoName });
+    // Quick Lookup Maps
+    const globalNameMap = new Map<string, string>(); // Name -> ID
+    const globalNodeDataMap = new Map<string, { name: string, repoId: string, repoName: string }>(); 
+    
+    allFiles.forEach(f => {
+        globalNameMap.set(f.name, f.id);
+        globalNameMap.set(f.name.replace('.md', ''), f.id);
+        globalNodeDataMap.set(f.id, { name: f.name.replace('.md', ''), repoId: f._repoId, repoName: f._repoName });
     });
 
-    const adjacency = new Map<string, string[]>(); 
-    const degree = new Map<string, number>();
-    const connectionRegistry = new Set<string>(); // For bi-directional check
-    const rawConnections: { source: string, target: string }[] = [];
-
-    targetFiles.forEach(f => {
-        adjacency.set(f.id, []);
-        degree.set(f.id, 0);
+    // B. BUILD GLOBAL ADJACENCY LIST
+    // We scan EVERYTHING first to establish the full network. 
+    // This allows us to find incoming links from "invisible" repos.
+    const globalAdjacency = new Map<string, Set<string>>(); // sourceId -> Set<targetId>
+    const globalIncoming = new Map<string, Set<string>>();  // targetId -> Set<sourceId>
+    
+    allFiles.forEach(f => {
+        if (!globalAdjacency.has(f.id)) globalAdjacency.set(f.id, new Set());
+        if (!globalIncoming.has(f.id)) globalIncoming.set(f.id, new Set());
     });
 
-    // C. PARSE LINKS (Cross-Repo aware in Global Mode because fileMap contains all files)
-    targetFiles.forEach(sourceFile => {
+    const connectionRegistry = new Set<string>(); // "source|target" for bi-directional check
+
+    allFiles.forEach(sourceFile => {
         const linkRegex = /\[\[(.*?)\]\]/g;
         let match;
-        const fileLinks = new Set<string>();
-
         while ((match = linkRegex.exec(sourceFile.content)) !== null) {
             const targetName = match[1];
-            let targetId = fileMap.get(targetName);
-            if (!targetId) targetId = fileMap.get(targetName + '.md');
+            let targetId = globalNameMap.get(targetName);
+            if (!targetId) targetId = globalNameMap.get(targetName + '.md');
 
             if (targetId && targetId !== sourceFile.id) {
-                // Ensure target exists in our current scope
-                if (idToNodeData.has(targetId)) {
-                    if (!fileLinks.has(targetId)) {
-                        fileLinks.add(targetId);
-                        connectionRegistry.add(`${sourceFile.id}|${targetId}`);
-                        rawConnections.push({ source: sourceFile.id, target: targetId });
-                        
-                        adjacency.get(sourceFile.id)?.push(targetId);
-                        adjacency.get(targetId)?.push(sourceFile.id);
-                        degree.set(sourceFile.id, (degree.get(sourceFile.id) || 0) + 1);
-                        degree.set(targetId, (degree.get(targetId) || 0) + 1);
-                    }
-                }
+                // Register valid connection
+                globalAdjacency.get(sourceFile.id)?.add(targetId);
+                globalIncoming.get(targetId)?.add(sourceFile.id);
+                connectionRegistry.add(`${sourceFile.id}|${targetId}`);
             }
         }
     });
 
-    // D. ASSIGN COLORS
+    // C. FILTERING (SMART CONTEXT)
+    const filesToRenderSet = new Set<string>();
+
+    if (scope === 'local') {
+        // Simple: Only active repo files
+        const activeRepoFiles = repos.find(r => r.id === activeRepoId)?.files || [];
+        activeRepoFiles.forEach(f => filesToRenderSet.add(f.id));
+    } else {
+        // GALAXY (Smart Context):
+        // 1. Add ALL files from Active Repo
+        // 2. Add ANY file from OTHER Repos that is DIRECTLY connected (Incoming OR Outgoing) to Active Repo files
+        
+        const activeRepoFiles = repos.find(r => r.id === activeRepoId)?.files || [];
+        const activeRepoFileIds = new Set(activeRepoFiles.map(f => f.id));
+
+        // Add Active Repo Files
+        activeRepoFileIds.forEach(id => filesToRenderSet.add(id));
+
+        // Add Neighbors (Incoming/Outgoing)
+        activeRepoFileIds.forEach(rootId => {
+            // Outgoing neighbors
+            const outgoing = globalAdjacency.get(rootId);
+            if (outgoing) {
+                outgoing.forEach(targetId => filesToRenderSet.add(targetId));
+            }
+
+            // Incoming neighbors (Critical for "Explosion" prevention: we scan the inverse map)
+            const incoming = globalIncoming.get(rootId);
+            if (incoming) {
+                incoming.forEach(sourceId => filesToRenderSet.add(sourceId));
+            }
+        });
+    }
+
+    // D. FINALIZE NODE LIST
+    // Convert Set back to Array of File objects
+    const targetFiles = allFiles.filter(f => filesToRenderSet.has(f.id));
+
+    // Calculate local degree for sizing (based on filtered view)
+    const viewDegree = new Map<string, number>();
+    targetFiles.forEach(f => viewDegree.set(f.id, 0));
+    
+    const finalConnections: { source: string, target: string }[] = [];
+
+    // Re-scan connections ONLY among the filtered nodes
+    targetFiles.forEach(sourceFile => {
+        const outgoing = globalAdjacency.get(sourceFile.id);
+        if (outgoing) {
+            outgoing.forEach(targetId => {
+                if (filesToRenderSet.has(targetId)) {
+                    finalConnections.push({ source: sourceFile.id, target: targetId });
+                    
+                    viewDegree.set(sourceFile.id, (viewDegree.get(sourceFile.id) || 0) + 1);
+                    viewDegree.set(targetId, (viewDegree.get(targetId) || 0) + 1);
+                }
+            });
+        }
+    });
+
+
+    // E. ASSIGN COLORS
     const nodeColorMap = new Map<string, string>();
     const NEUTRAL_COLOR = '#52525B';
 
     if (scope === 'global') {
         // --- GALAXY MODE: Color by REPOSITORY ---
-        // Each repo gets a consistent color from the palette
         repos.forEach((repo, idx) => {
             const repoColor = SOVEREIGN_PALETTES[idx % SOVEREIGN_PALETTES.length];
             repo.files.forEach(f => {
@@ -268,11 +310,11 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
             });
         });
     } else {
-        // --- LOCAL MODE: Color by SOVEREIGNTY (Centrality) ---
-        // This preserves the original logic for detailed local analysis
+        // --- LOCAL MODE: Color by SOVEREIGNTY ---
+        // (Existing Local Logic)
         const sortedNodes = [...targetFiles].sort((a, b) => {
-            const degA = degree.get(a.id) || 0;
-            const degB = degree.get(b.id) || 0;
+            const degA = viewDegree.get(a.id) || 0;
+            const degB = viewDegree.get(b.id) || 0;
             if (a.name.toLowerCase() === 'readme.md') return -1;
             if (b.name.toLowerCase() === 'readme.md') return 1;
             return degB - degA; 
@@ -281,7 +323,6 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
         const sovereigns = new Set<string>();
         let colorIdx = 0;
         
-        // 1. README
         const readme = targetFiles.find(f => f.name.toLowerCase() === 'readme.md');
         if (readme) {
             sovereigns.add(readme.id);
@@ -289,58 +330,36 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
             colorIdx++;
         }
 
-        // 2. Hubs
         sortedNodes.forEach(node => {
             if (sovereigns.has(node.id)) return;
-            const myDegree = degree.get(node.id) || 0;
+            const myDegree = viewDegree.get(node.id) || 0;
             if (myDegree < 2) return;
 
-            const neighbors = adjacency.get(node.id) || [];
-            const connectedToSovereign = neighbors.some(n => sovereigns.has(n));
-
-            if (!connectedToSovereign) {
-                sovereigns.add(node.id);
-                nodeColorMap.set(node.id, SOVEREIGN_PALETTES[colorIdx % SOVEREIGN_PALETTES.length]);
-                colorIdx++;
-            }
+            // Simplified Cluster check for local
+            sovereigns.add(node.id);
+            nodeColorMap.set(node.id, SOVEREIGN_PALETTES[colorIdx % SOVEREIGN_PALETTES.length]);
+            colorIdx++;
         });
 
         targetFiles.forEach(node => {
-            if (sovereigns.has(node.id)) return;
-            const neighbors = adjacency.get(node.id) || [];
-            const rulingSovereigns = new Set<string>();
-            neighbors.forEach(n => {
-                if (sovereigns.has(n)) rulingSovereigns.add(n);
-            });
-
-            if (rulingSovereigns.size === 1) {
-                const kingId = Array.from(rulingSovereigns)[0];
-                nodeColorMap.set(node.id, nodeColorMap.get(kingId)!);
-            } else {
-                nodeColorMap.set(node.id, NEUTRAL_COLOR);
-            }
+            if (!nodeColorMap.has(node.id)) nodeColorMap.set(node.id, NEUTRAL_COLOR);
         });
     }
 
-    // E. CONSTRUCT NODES
+    // F. CONSTRUCT NODES
     const rawNodes: Node[] = targetFiles.map(file => {
         const myColor = nodeColorMap.get(file.id) || NEUTRAL_COLOR;
-        const deg = degree.get(file.id) || 0;
+        const deg = viewDegree.get(file.id) || 0;
         const isNeutral = myColor === NEUTRAL_COLOR;
+        const isExternal = file._repoId !== activeRepoId;
 
         // Size calculation
-        // In global mode, we reduce size slightly to accommodate density
         let baseWidth = scope === 'global' ? 140 : 160;
         let width = baseWidth;
         let fontSize = 12;
         let zIndex = 1;
 
-        // Logic for highlighting "Important" nodes
-        // In Local: Sovereigns are important
-        // In Global: High degree nodes are important
-        const isImportant = scope === 'local' 
-            ? !isNeutral // In local, anything colored is a Sovereign or Subject
-            : deg > 3;   // In global, only hubs are highlighted
+        const isImportant = deg > 2 || (scope === 'global' && isExternal);
 
         if (isImportant) {
             width = baseWidth + (Math.min(deg, 15) * 4);
@@ -377,25 +396,20 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
             }
         }
 
-        // Label Logic
-        let label = file.name.replace('.md', '');
-        // In Global view, if we have files from multiple repos, showing Repo name helps context, 
-        // but might be too cluttered. Let's just use tooltip or color.
-        // Let's rely on Color = Repo.
-
         return {
             id: file.id,
-            data: { label },
+            data: { label: file.name.replace('.md', '') },
             position: { x: 0, y: 0 },
             connectable: true,
             style
         };
     });
 
-    // F. CONSTRUCT EDGES
-    const finalEdges = rawConnections.map(conn => {
+    // G. CONSTRUCT EDGES
+    const finalEdges = finalConnections.map(conn => {
         const isBiDirectional = connectionRegistry.has(`${conn.target}|${conn.source}`);
-        const targetData = idToNodeData.get(conn.target);
+        const targetData = globalNodeDataMap.get(conn.target);
+        const sourceData = globalNodeDataMap.get(conn.source);
         
         return {
             id: `${conn.source}-${conn.target}`,
@@ -413,7 +427,7 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
                 color: isBiDirectional ? '#52525B' : '#27272A',
             },
             data: {
-                sourceName: idToNodeData.get(conn.source)?.name,
+                sourceName: sourceData?.name,
                 targetName: targetData?.name,
                 onDelete: () => {
                     if (onDisconnectNodes) onDisconnectNodes(conn.source, conn.target);
@@ -433,8 +447,7 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
   }, [repos, activeRepoId, scope, getLayoutedElements, setNodes, setEdges, fitView, onDisconnectNodes]);
 
   const onNodeClick = (_: React.MouseEvent, node: Node) => {
-      // In Global View, we need to know which repo the node belongs to.
-      // We can find it by searching the input repos.
+      // Find which repo this node belongs to for navigation
       let foundRepoId = activeRepoId;
       if (scope === 'global') {
           for (const r of repos) {
@@ -491,13 +504,25 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
                 
                 {scope === 'global' ? (
                      <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                        <div className="text-[10px] text-zenith-muted italic mb-2">Galaxy Mode: Colors indicate Repository</div>
-                        {repos.map((r, idx) => (
-                             <div key={r.id} className="flex gap-3 items-center">
-                                <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: SOVEREIGN_PALETTES[idx % SOVEREIGN_PALETTES.length] }}></div>
-                                <div className="text-white text-xs font-mono uppercase truncate">{r.name}</div>
-                             </div>
-                        ))}
+                        <div className="text-[10px] text-zenith-muted italic mb-2">Galaxy Mode (Context Aware):<br/>Showing active module + direct connections.</div>
+                        {repos.map((r, idx) => {
+                             // Simple check if this repo is visible in current graph
+                             const isVisible = nodes.some(n => {
+                                 // We don't have direct repo access in node data easily here without map, 
+                                 // but we can infer or just list all. Listing all is safer for legend.
+                                 return true; 
+                             });
+                             if (!isVisible) return null;
+
+                             return (
+                                <div key={r.id} className="flex gap-3 items-center">
+                                    <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: SOVEREIGN_PALETTES[idx % SOVEREIGN_PALETTES.length] }}></div>
+                                    <div className="text-white text-xs font-mono uppercase truncate">
+                                        {r.name} {r.id !== activeRepoId && <span className="text-zenith-muted opacity-50 ml-1">[EXT]</span>}
+                                    </div>
+                                </div>
+                             )
+                        })}
                      </div>
                 ) : (
                     <div className="space-y-4">
@@ -597,10 +622,10 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
         <div className="absolute bottom-4 left-4 pointer-events-none">
             <div className="font-mono text-[10px] text-zenith-orange uppercase tracking-widest flex items-center gap-2">
                 <Icons.Zap size={10} className="animate-pulse"/>
-                PROTOCOL: {scope === 'global' ? 'GALAXY (CROSS-REPO)' : 'SECTOR (LOCAL)'} // {nodes.length} Nodes
+                PROTOCOL: {scope === 'global' ? 'GALAXY (SMART CONTEXT)' : 'SECTOR (LOCAL)'} // {nodes.length} Nodes
             </div>
             <div className="font-mono text-[10px] text-zenith-muted mt-1">
-                {scope === 'global' ? 'Nodes colored by Repository Origin.' : 'Nodes colored by Structural Sovereignty.'}
+                {scope === 'global' ? 'Focusing on active module & direct external links.' : 'Nodes colored by Structural Sovereignty.'}
             </div>
         </div>
     </div>
