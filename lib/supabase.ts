@@ -1,17 +1,19 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// CRITICAL FOR VPS/PRODUCTION BUILDS:
-// We must access import.meta.env properties DIRECTLY (e.g., import.meta.env.VITE_VAR).
-// Vite performs static string replacement at build time. 
-// Indirect access (like `const env = import.meta.env; const val = env.KEY`) often fails 
-// because the bundler cannot trace the variable usage to perform the replacement.
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Access environment variables safely.
+// We use a fallback object to prevent crashes if import.meta.env is undefined.
+const env = import.meta.env || {};
+const supabaseUrl = (env as any).VITE_SUPABASE_URL || '';
+const supabaseAnonKey = (env as any).VITE_SUPABASE_ANON_KEY || '';
 
+// Logic to determine if we should run in Cloud Mode (Supabase) or Local Mode (LocalStorage)
+// In local development without a .env file, these checks ensure we fall back to constants.ts data.
 export const isSupabaseConfigured = !!(
   supabaseUrl && 
   supabaseAnonKey && 
-  supabaseUrl !== 'your_supabase_project_url_here'
+  // Check against common placeholder values to avoid connecting to non-existent backends
+  !supabaseUrl.includes('your-project-id') &&
+  !supabaseUrl.includes('your_supabase_project_url')
 );
 
 // Standard anon client for public checks

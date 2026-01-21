@@ -64,6 +64,32 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
       }
   };
 
+  const handleDisconnectNodes = (sourceId: string, targetId: string) => {
+      if (!isAuthenticated) return;
+
+      const sourceFile = repo.files.find(f => f.id === sourceId);
+      const targetFile = repo.files.find(f => f.id === targetId);
+
+      if (sourceFile && targetFile) {
+          const linkName = targetFile.name.replace('.md', '');
+          
+          // Safer Regex Construction
+          // 1. Escape the link name to treat it as literal text
+          const escapedLinkName = linkName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          
+          // 2. Build pattern: [[LinkName]] or [[LinkName.md]]
+          // We construct string first to avoid template literal escaping confusion
+          // Matches: [[ + LiteralName + (optional .md) + ]]
+          const pattern = '\\[\\[' + escapedLinkName + '(?:\\.md)?\\]\\]';
+          const regex = new RegExp(pattern, 'g');
+
+          // Remove the link from content
+          const newContent = sourceFile.content.replace(regex, '');
+          
+          onUpdateFile(repo.id, sourceId, newContent);
+      }
+  };
+
   // Find README for preview
   const readme = repo.files.find(f => f.name.toLowerCase() === 'readme.md');
 
@@ -152,6 +178,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
                 repo={repo} 
                 onAddFile={() => setShowAddFile(true)}
                 onLinkNodes={handleConnectNodes}
+                onDisconnectNodes={handleDisconnectNodes}
              />
           </div>
       ) : (
