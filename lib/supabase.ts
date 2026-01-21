@@ -1,10 +1,12 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Cast import.meta to any to avoid "Property 'env' does not exist" type error
-const env = (import.meta as any).env || {};
-
-const supabaseUrl = env.VITE_SUPABASE_URL;
-const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY;
+// CRITICAL FOR VPS/PRODUCTION BUILDS:
+// We must access import.meta.env properties DIRECTLY (e.g., import.meta.env.VITE_VAR).
+// Vite performs static string replacement at build time. 
+// Indirect access (like `const env = import.meta.env; const val = env.KEY`) often fails 
+// because the bundler cannot trace the variable usage to perform the replacement.
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = !!(
   supabaseUrl && 
@@ -14,7 +16,7 @@ export const isSupabaseConfigured = !!(
 
 // Standard anon client for public checks
 export const supabase: SupabaseClient | null = isSupabaseConfigured
-  ? createClient(supabaseUrl as string, supabaseAnonKey as string)
+  ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
 // Authenticated client factory
@@ -29,4 +31,4 @@ export const getAuthenticatedClient = (secretKey: string): SupabaseClient | null
       }
     }
   });
-};
+}
