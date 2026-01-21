@@ -1,164 +1,175 @@
+
 import { Repository } from './types';
 
 export const INITIAL_REPOS: Repository[] = [
   {
     id: 'repo-1',
-    name: 'neural-archive',
-    description: 'Central knowledge hub. Connected thoughts and second brain storage.',
+    name: 'nexus-prime',
+    description: 'Central operations hub. Contains complex graph structures with crossing dependencies.',
     isPrivate: true,
     updatedAt: new Date().toISOString(),
-    stars: 42,
+    stars: 88,
     language: 'Markdown',
     files: [
       {
         id: 'file-1-1',
         name: 'README.md',
-        content: `# NEURAL ARCHIVE v2.0\n\nEntry point for external memory storage.\n\n## Core Sectors\n\n- [[01-Philosophy]]: Mental models and core beliefs.\n- [[02-Technology]]: Stack definitions and research.\n- [[03-Journal]]: Daily data dumps.\n\n> "The map is not the territory."`,
+        content: `# NEXUS PRIME\n\nEntry point for the Knowledge Graph.\n\n## Core Sectors\n\n1. [[01-Project-Mars]] - Planetary Colonization\n2. [[02-AI-Research]] - Neural Networks\n3. [[03-Poetry-Collection]] - Arts & Culture (Independent)\n\n> "Structure is the enemy of entropy."`,
         updatedAt: new Date().toISOString(),
         language: 'markdown',
         size: 1024
       },
+      
+      // --- THEME A: PROJECT MARS (Cluster 1) ---
       {
         id: 'file-1-2',
-        name: '01-Philosophy.md',
-        content: `# Philosophy & Mental Models\n\nCore operating principles.\n\n### Concepts\n- [[Stoicism-Applied]]: Practical handbook.\n- [[Digital-Minimalism]]: Reducing signal noise.\n\nReturn to [[README]]`,
+        name: '01-Project-Mars.md',
+        content: `# Project Mars\n\nObjective: Terraforming and colonization.\n\n### Modules\n- [[Life-Support-Systems]]\n- [[Rocket-Propulsion-v9]]\n- [[Rover-Logistics]]\n\nStatus: ACTIVE`,
         updatedAt: new Date(Date.now() - 100000).toISOString(),
-        language: 'markdown',
-        size: 512
-      },
-      {
-        id: 'file-1-3',
-        name: '02-Technology.md',
-        content: `# Tech Radar\n\nCurrent focus areas for Q3.\n\n## Active Research\n- [[React-Server-Components]]: The future of frontend.\n- [[Supabase-Architecture]]: Backend as a service.\n- [[Rust-Lang]]: Systems programming.\n\n## Legacy\n- [[jQuery-Patterns]] (Deprecated)\n\nReturn to [[README]]`,
-        updatedAt: new Date(Date.now() - 200000).toISOString(),
         language: 'markdown',
         size: 800
       },
       {
-        id: 'file-1-4',
-        name: 'React-Server-Components.md',
-        content: `# RSC Analysis\n\nServer components allow for zero-bundle-size rendering.\n\nSee also: [[Supabase-Architecture]] for data fetching patterns.\nParent: [[02-Technology]]`,
-        updatedAt: new Date(Date.now() - 300000).toISOString(),
+        id: 'file-1-3',
+        name: 'Life-Support-Systems.md',
+        content: `# Oxygen Generation\n\nCritical path for [[01-Project-Mars]].\nRequires: [[Water-Filtration]].`,
+        updatedAt: new Date(Date.now() - 200000).toISOString(),
         language: 'markdown',
-        size: 600
+        size: 400
       },
       {
-        id: 'file-1-5',
-        name: 'Supabase-Architecture.md',
-        content: `# Supabase Structure\n\nUtilizing Postgres RLS for security.\n\nIntegrates well with: [[React-Server-Components]].\nParent: [[02-Technology]]`,
-        updatedAt: new Date(Date.now() - 400000).toISOString(),
+        id: 'file-1-4',
+        name: 'Rocket-Propulsion-v9.md',
+        content: `# Heavy Lift Vehicle\n\nEngine specs for the interplanetary transport.\nParent: [[01-Project-Mars]]`,
+        updatedAt: new Date(Date.now() - 300000).toISOString(),
         language: 'markdown',
-        size: 450
+        size: 500
+      },
+
+      // --- THEME B: AI RESEARCH (Cluster 2) ---
+      {
+        id: 'file-1-5',
+        name: '02-AI-Research.md',
+        content: `# Artificial Intelligence Lab\n\nFocus: AGI and Computer Vision.\n\n### Active Experiments\n- [[Neural-Networks-Deep]]\n- [[Computer-Vision-API]]\n- [[Ethical-Constraints]]`,
+        updatedAt: new Date(Date.now() - 150000).toISOString(),
+        language: 'markdown',
+        size: 750
       },
       {
         id: 'file-1-6',
-        name: 'Stoicism-Applied.md',
-        content: `# The Obstacle is the Way\n\nFocus on what you can control.\n\nRelated: [[Digital-Minimalism]]\nParent: [[01-Philosophy]]`,
-        updatedAt: new Date(Date.now() - 500000).toISOString(),
+        name: 'Neural-Networks-Deep.md',
+        content: `# Deep Learning Models\n\nTransformer architectures.\nParent: [[02-AI-Research]]`,
+        updatedAt: new Date(Date.now() - 250000).toISOString(),
+        language: 'markdown',
+        size: 600
+      },
+      
+      // --- THE CROSS-OVER (The "Clerk" connecting Mars and AI) ---
+      {
+        id: 'file-1-7',
+        name: 'Autonomous-Drones.md',
+        content: `# Autonomous Survey Drones\n\n**The Intersection Point**\n\nThese drones are used by [[01-Project-Mars]] for surface mapping.\n\nHowever, they run on software developed in [[02-AI-Research]] (specifically [[Computer-Vision-API]]).\n\nThis node should physically pull the two clusters together.`,
+        updatedAt: new Date(Date.now() - 50000).toISOString(),
+        language: 'markdown',
+        size: 1200
+      },
+      {
+        id: 'file-1-8',
+        name: 'Computer-Vision-API.md',
+        content: `# Vision Systems\n\nObject detection algorithms.\n\nUsed by: [[Autonomous-Drones]]\nParent: [[02-AI-Research]]`,
+        updatedAt: new Date(Date.now() - 60000).toISOString(),
+        language: 'markdown',
+        size: 500
+      },
+
+      // --- THEME C: POETRY COLLECTION (Cluster 3 - Completely Isolated) ---
+      {
+        id: 'file-1-9',
+        name: '03-Poetry-Collection.md',
+        content: `# The Quiet Corner\n\nA collection of distinct thoughts, unconnected to the tech stack.\n\n- [[Haiku-01]]\n- [[Haiku-02]]`,
+        updatedAt: new Date(Date.now() - 800000).toISOString(),
         language: 'markdown',
         size: 300
       },
       {
-        id: 'file-1-7',
-        name: 'Digital-Minimalism.md',
-        content: `# Digital Declutter\n\n30 day protocol.\n\nSee: [[Stoicism-Applied]]\nParent: [[01-Philosophy]]`,
-        updatedAt: new Date(Date.now() - 600000).toISOString(),
+        id: 'file-1-10',
+        name: 'Haiku-01.md',
+        content: `# Winter\n\nCode flows like water\nBugs freeze in the winter ice\nDeploy on Friday`,
+        updatedAt: new Date(Date.now() - 810000).toISOString(),
         language: 'markdown',
-        size: 300
+        size: 100
+      },
+      {
+        id: 'file-1-11',
+        name: 'Haiku-02.md',
+        content: `# Server Room\n\nBlinking lights in dark\nFans humming a quiet song\nData sleeps inside`,
+        updatedAt: new Date(Date.now() - 820000).toISOString(),
+        language: 'markdown',
+        size: 100
+      },
+      
+      // --- ORPHAN (Testing Edge Case) ---
+      {
+        id: 'file-1-12',
+        name: 'Lost-Note.md',
+        content: `I am floating in the void. No one links to me, and I link to no one.`,
+        updatedAt: new Date(Date.now() - 900000).toISOString(),
+        language: 'markdown',
+        size: 50
       }
     ]
   },
   {
     id: 'repo-2',
-    name: 'titan-protocol',
-    description: 'System architecture for Project Titan. Confidential.',
+    name: 'black-ops-log',
+    description: 'Classified operations. Testing linear chains.',
     isPrivate: true,
     updatedAt: new Date(Date.now() - 172800000).toISOString(),
-    stars: 128,
-    language: 'TypeScript',
+    stars: 12,
+    language: 'Text',
     files: [
       {
         id: 'file-2-1',
-        name: 'SYSTEM_CORE.md',
-        content: `# PROJECT TITAN // CORE\n\nSystem Entry Point.\n\n## Modules\n\n1. [[AUTH_MODULE]]: User identity & access control.\n2. [[PAYMENT_GATEWAY]]: Stripe integration logic.\n3. [[DATA_PIPELINE]]: ETL processes.\n\nStatus: ACTIVE`,
-        updatedAt: new Date(Date.now() - 100000).toISOString(),
+        name: 'Mission-Alpha.md',
+        content: `Start point. Goes to [[Mission-Beta]].`,
+        updatedAt: new Date().toISOString(),
         language: 'markdown',
-        size: 2048
+        size: 100
       },
       {
         id: 'file-2-2',
-        name: 'AUTH_MODULE.md',
-        content: `# Authentication Module\n\nHandles JWT issuance and rotation.\n\nDependencies:\n- [[USER_SCHEMA]]\n- [[SESSION_STORE]]\n\nUpstream: [[SYSTEM_CORE]]`,
-        updatedAt: new Date(Date.now() - 200000).toISOString(),
+        name: 'Mission-Beta.md',
+        content: `Mid point. Goes to [[Mission-Gamma]].`,
+        updatedAt: new Date().toISOString(),
         language: 'markdown',
-        size: 1024
+        size: 100
       },
       {
         id: 'file-2-3',
-        name: 'PAYMENT_GATEWAY.md',
-        content: `# Payment Processing\n\nHandles subscriptions.\n\nRequires: [[USER_SCHEMA]] for billing details.\nUpstream: [[SYSTEM_CORE]]`,
-        updatedAt: new Date(Date.now() - 300000).toISOString(),
+        name: 'Mission-Gamma.md',
+        content: `End point. Refers back to [[Mission-Alpha]]. (Loop Test)`,
+        updatedAt: new Date().toISOString(),
         language: 'markdown',
-        size: 1024
-      },
-      {
-        id: 'file-2-4',
-        name: 'USER_SCHEMA.md',
-        content: `# Database Schema: Users\n\nDefines user table structure.\n\nReferenced by: [[AUTH_MODULE]] and [[PAYMENT_GATEWAY]].`,
-        updatedAt: new Date(Date.now() - 400000).toISOString(),
-        language: 'sql',
-        size: 1024
-      },
-      {
-         id: 'file-2-5',
-         name: 'SESSION_STORE.md',
-         content: `# Redis Session Store\n\nTTL configuration for user sessions.\n\nPart of: [[AUTH_MODULE]]`,
-         updatedAt: new Date(Date.now() - 500000).toISOString(),
-         language: 'markdown',
-         size: 500
+        size: 100
       }
     ]
   },
   {
     id: 'repo-3',
-    name: 'black-ops-log',
-    description: 'Scattered thoughts, fragments, and unstable data.',
-    isPrivate: true,
-    updatedAt: new Date(Date.now() - 500000000).toISOString(),
-    stars: 0,
-    language: 'Text',
+    name: 'library-interlink-test',
+    description: 'Testing references to other repositories.',
+    isPrivate: false,
+    updatedAt: new Date(Date.now() - 500000).toISOString(),
+    stars: 5,
+    language: 'Markdown',
     files: [
         {
             id: 'file-3-1',
-            name: 'fragment-01.md',
-            content: `Signal detected on channel 4.\n\nSeems related to [[fragment-03]].`,
+            name: 'External-Ref.md',
+            content: `# Cross-Repo Reference\n\nThis note references a file in another repo conceptually:\n\nSee [[01-Project-Mars]] in Nexus Prime.`,
             updatedAt: new Date().toISOString(),
             language: 'markdown',
-            size: 100
-        },
-        {
-            id: 'file-3-2',
-            name: 'fragment-02.md',
-            content: `Encryption key missing.\n\nCheck [[fragment-01]] for headers.\nPossible link to [[fragment-04]].`,
-            updatedAt: new Date().toISOString(),
-            language: 'markdown',
-            size: 120
-        },
-        {
-            id: 'file-3-3',
-            name: 'fragment-03.md',
-            content: `Decoding...\n\nData corrupted. See [[fragment-02]].`,
-            updatedAt: new Date().toISOString(),
-            language: 'markdown',
-            size: 80
-        },
-        {
-            id: 'file-3-4',
-            name: 'fragment-04.md',
-            content: `The loop is closed.\n\n[[fragment-01]] -> [[fragment-02]] -> [[fragment-03]] -> [[fragment-04]].`,
-            updatedAt: new Date().toISOString(),
-            language: 'markdown',
-            size: 150
+            size: 200
         }
     ]
   }

@@ -59,8 +59,11 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
 
       if (sourceFile && targetFile) {
           const linkName = targetFile.name.replace('.md', '');
-          const newContent = sourceFile.content + `\n\nRelated: [[${linkName}]]`;
-          onUpdateFile(repo.id, sourceId, newContent);
+          // Check if link already exists to prevent duplication
+          if (!sourceFile.content.includes(`[[${linkName}]]`)) {
+             const newContent = sourceFile.content + `\n\nRelated: [[${linkName}]]`;
+             onUpdateFile(repo.id, sourceId, newContent);
+          }
       }
   };
 
@@ -72,20 +75,44 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
 
       if (sourceFile && targetFile) {
           const linkName = targetFile.name.replace('.md', '');
-          
-          // Safer Regex Construction
-          // 1. Escape the link name to treat it as literal text
           const escapedLinkName = linkName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           
-          // 2. Build pattern: [[LinkName]] or [[LinkName.md]]
-          // We construct string first to avoid template literal escaping confusion
-          // Matches: [[ + LiteralName + (optional .md) + ]]
-          const pattern = '\\[\\[' + escapedLinkName + '(?:\\.md)?\\]\\]';
-          const regex = new RegExp(pattern, 'g');
+          const lines = sourceFile.content.split('\n');
+          const newLines = lines.filter(line => {
+              // 1. Check if line contains the link at all
+              const linkRegex = new RegExp(`\\[\\[${escapedLinkName}(?:\\.md)?\\]\\]`, 'i');
+              if (!linkRegex.test(line)) return true;
 
-          // Remove the link from content
-          const newContent = sourceFile.content.replace(regex, '');
+              // 2. SMART REMOVAL LOGIC
+              
+              // Case A: List Item (e.g., "- [[Link]] - Description" or "1. [[Link]]")
+              // Regex matches: Start of line -> optional whitespace -> list marker -> whitespace -> [[Link]] -> anything else
+              const listItemRegex = new RegExp(`^\\s*(?:[-*+]|\\d+\\.)\\s*\\[\\[${escapedLinkName}(?:\\.md)?\\]\\].*$`, 'i');
+              if (listItemRegex.test(line)) return false; // Remove entire line
+
+              // Case B: Key-Value / Property (e.g., "Related: [[Link]]")
+              const propRegex = new RegExp(`^\\s*(?:Related|Parent|Child|See|Source|Upstream|Ref)\\s*:?\\s*\\[\\[${escapedLinkName}(?:\\.md)?\\]\\].*$`, 'i');
+              if (propRegex.test(line)) return false; // Remove entire line
+              
+              // Case C: Just the link on a line by itself
+              if (line.trim() === `[[${linkName}]]` || line.trim() === `[[${linkName}.md]]`) return false;
+
+              // Case D: Embedded/Inline Link (e.g. "I learned about [[Link]] today")
+              // We KEEP the line, but we will strip the link syntax later in the map function.
+              return true;
+          }).map(line => {
+              // 3. CLEAN UP INLINE LINKS
+              // If the line survived the filter, it means it's an inline context.
+              // We downgrade "[[Link]]" to just "Link" to sever the graph connection but preserve text.
+              const linkRegex = new RegExp(`\\[\\[(${escapedLinkName})(?:\\.md)?\\]\\]`, 'gi');
+              return line.replace(linkRegex, '$1'); 
+          });
+
+          let newContent = newLines.join('\n');
           
+          // Cleanup potential double newlines left by deleting lines
+          newContent = newContent.replace(/\n{3,}/g, '\n\n').trim();
+
           onUpdateFile(repo.id, sourceId, newContent);
       }
   };
