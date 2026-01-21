@@ -6,12 +6,9 @@ import MarkdownPreview, { generateSlug } from '../components/MarkdownPreview';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import EditorToolbar from '../components/EditorToolbar';
 import LinkSelectorModal from '../components/LinkSelectorModal';
-// Use default import for Turndown, but handle 'default' property at runtime if needed
-// @ts-ignore
-import TurndownService from 'turndown';
-// Use named import for gfm plugin
-// @ts-ignore
-import { gfm } from 'turndown-plugin-gfm';
+import { convertHtmlToMarkdown } from '../utils/markdownPaste';
+import BacklinksPanel from '../components/Editor/BacklinksPanel';
+import TableOfContents, { TocItem } from '../components/Editor/TableOfContents';
 
 interface FileEditorProps {
   repos: Repository[];
@@ -22,20 +19,6 @@ interface FileEditorProps {
 }
 
 type ViewMode = 'write' | 'preview' | 'split';
-
-interface TocItem {
-  id: string;
-  text: string;
-  level: number;
-}
-
-interface Backlink {
-  fileId: string;
-  fileName: string;
-  repoId: string;
-  repoName: string;
-  context: string;
-}
 
 const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFile, onDeleteFile, isAuthenticated }) => {
   const { repoId, fileId } = useParams<{ repoId: string; fileId: string }>();
@@ -66,19 +49,15 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
   // --- Backlinks Logic ---
   const backlinks = useMemo(() => {
     if (!repoId || !fileId) return [];
-    const links: Backlink[] = [];
     const targetLink = `/${repoId}/${fileId}`;
+    const links: any[] = [];
 
     repos.forEach(r => {
         r.files.forEach(f => {
-            // Don't link to self
             if (f.id === fileId) return;
-
             if (f.content.includes(targetLink)) {
-                // Try to find context (line containing the link)
                 const lines = f.content.split('\n');
                 const matchLine = lines.find(l => l.includes(targetLink)) || "Link found in document";
-                // Clean link syntax for display
                 const cleanContext = matchLine.replace(/\[(.*?)\]\(.*?\)/g, '$1').trim();
 
                 links.push({
@@ -95,13 +74,9 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
   }, [repos, repoId, fileId]);
 
   // --- Table of Contents Logic ---
-  const toc = useMemo(() => {
+  const toc: TocItem[] = useMemo(() => {
     if (!content) return [];
-    
-    // Regex to match # Heading, ## Heading etc.
-    const headingRegex = /^(#{1,3})\s+(.+)$/gm;
     const items: TocItem[] = [];
-    
     const lines = content.split('\n');
     let inCodeBlock = false;
 
@@ -116,7 +91,6 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
         if (headingMatch) {
             const level = headingMatch[1].length;
             const text = headingMatch[2].trim();
-            // Remove markdown links or bold from TOC text if present
             const cleanText = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/(\*\*|__)(.*?)\1/g, '$2');
             
             items.push({
@@ -126,7 +100,6 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
             });
         }
     });
-
     return items;
   }, [content]);
 
@@ -146,7 +119,6 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
         let name = renameValue.trim();
         if (!name.endsWith('.md')) name += '.md';
         onRenameFile(repoId!, fileId!, name);
-        // Show Feedback
         setConversionStatus("REFACTORING LINKS...");
         setTimeout(() => setConversionStatus(null), 2000);
     }
@@ -156,11 +128,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
   const handleContentChange = (val: string) => {
       setContent(val);
       setHasChanges(val !== file.content);
-
-      // Trigger Link Selector on '[['
-      if (val.endsWith('[[')) {
-          setIsLinkSelectorOpen(true);
-      }
+      if (val.endsWith('[[')) setIsLinkSelectorOpen(true);
   }
 
   const handleDeleteConfirm = () => {
@@ -174,12 +142,8 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
     const start = textAreaRef.current.selectionStart;
     const end = textAreaRef.current.selectionEnd;
     const text = textAreaRef.current.value;
-    const before = text.substring(0, start);
-    const selection = text.substring(start, end);
-    const after = text.substring(end);
-
-    const newText = before + prefix + selection + suffix + after;
-    // Don't call handleContentChange directly to avoid double triggering logic if we used it, but here we just set state
+    const newText = text.substring(0, start) + prefix + text.substring(start, end) + suffix + text.substring(end);
+    
     setContent(newText);
     setHasChanges(true);
     
@@ -197,10 +161,8 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
       const start = textAreaRef.current.selectionStart;
       const end = textAreaRef.current.selectionEnd;
       const currentText = textAreaRef.current.value;
-      const before = currentText.substring(0, start);
-      const after = currentText.substring(end);
+      const newText = currentText.substring(0, start) + textToInsert + currentText.substring(end);
       
-      const newText = before + textToInsert + after;
       setContent(newText);
       setHasChanges(true);
       
@@ -215,16 +177,13 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
   };
 
   const handleLinkSelect = (targetRepoId: string, targetFileId: string, targetName: string) => {
-      // Remove the '[[' trigger if it exists at the end
       if (textAreaRef.current) {
          const val = textAreaRef.current.value;
          const end = textAreaRef.current.selectionEnd;
-         // Check if cursor is right after '[['
          if (val.substring(end - 2, end) === '[[') {
-             // Remove '[[' and insert link
              const before = val.substring(0, end - 2);
              const after = val.substring(end);
-             const linkMd = `[[${targetName.replace('.md', '')}]]`; // Using WikiLink Style preference based on user behavior
+             const linkMd = `[[${targetName.replace('.md', '')}]]`;
              const newText = before + linkMd + after;
              setContent(newText);
              setHasChanges(true);
@@ -238,114 +197,27 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
              return;
          }
       }
-
-      // Normal insertion via button
       const linkMd = `[[${targetName.replace('.md', '')}]]`;
       insertTextAtCursor(linkMd);
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     if (!isAuthenticated) return;
-
     const clipboardData = e.clipboardData;
-    const types = clipboardData.types;
-    
-    // Check for HTML content
-    if (types.includes('text/html')) {
-        const html = clipboardData.getData('text/html');
-        
+    if (clipboardData.types.includes('text/html')) {
+        e.preventDefault();
         try {
-            e.preventDefault(); 
-
-            // 1. Robust Constructor Resolution
-            let ServiceClass = TurndownService;
-            // @ts-ignore
-            if (typeof ServiceClass !== 'function' && ServiceClass.default) {
-                // @ts-ignore
-                ServiceClass = ServiceClass.default;
-            }
-
-            if (typeof ServiceClass !== 'function') {
-                throw new Error("Could not find TurndownService constructor.");
-            }
-
-            // 2. Initialize Service
-            // @ts-ignore
-            const turndownService = new ServiceClass({
-                headingStyle: 'atx',
-                codeBlockStyle: 'fenced',
-                bulletListMarker: '-',
-                emDelimiter: '*',
-                hr: '***' // Use asterisks to avoid Frontmatter conflicts
-            });
-
-            // 3. Robust Plugin Loading (Fail-safe)
-            try {
-                if (typeof gfm === 'function') {
-                    turndownService.use(gfm);
-                } else {
-                    console.warn("GitNotes Warning: GFM plugin not available, skipping tables support.");
-                }
-            } catch (pluginErr) {
-                console.warn("GitNotes Warning: Error applying GFM plugin, continuing with basic markdown.", pluginErr);
-            }
-
-            // Pure Text Mode: Remove images
-            turndownService.remove('img');
-            turndownService.remove('picture');
-
-            // 4. Custom Rules
-            turndownService.addRule('pre', {
-                filter: ['pre'],
-                replacement: function (content: string, node: any) {
-                     return '\n```\n' + node.textContent + '\n```\n';
-                }
-            });
-
-             // Force HR rule to be asterisks here too
-             turndownService.addRule('horizontalRule', {
-                filter: 'hr',
-                replacement: function () {
-                    return '\n\n***\n\n';
-                }
-            });
-
-            // 5. Execute Conversion
-            let markdown = turndownService.turndown(html);
-            
-            // --- DATA CLEANUP PIPELINE ---
-            // 1. Unescape common markdown structures at start of line
-            markdown = markdown.replace(/^\\(#+)/gm, '$1'); // \# -> #
-            markdown = markdown.replace(/^\\>/gm, '>');     // \> -> >
-            markdown = markdown.replace(/^\\([-*+])/gm, '$1'); // \- -> -
-            
-            // 2. Unescape specific patterns
-            markdown = markdown.replace(/^(\\\*){3,}$/gm, '***'); // \*\*\* -> ***
-            markdown = markdown.replace(/\\([\[\]])/g, '$1');     // \[Link\] -> [Link]
-            
-            // 3. Remove artifacts
-            markdown = markdown.replace(/↩︎/g, ''); // Remove footnote returns
-
-            // 4. Normalize Whitespace (Collapse 3+ newlines to 2)
-            markdown = markdown.replace(/\n{3,}/g, '\n\n');
-
-            // Visual Feedback
+            const html = clipboardData.getData('text/html');
+            const markdown = convertHtmlToMarkdown(html);
+            insertTextAtCursor(markdown);
             setConversionStatus("SMART PASTE: CLEANED");
             setTimeout(() => setConversionStatus(null), 3000);
-
-            insertTextAtCursor(markdown);
-
         } catch (err) {
-            console.error("GitNotes Paste Error:", err);
-            
-            // Fallback: manually insert the plain text since we prevented default
             const plainText = clipboardData.getData('text/plain');
             insertTextAtCursor(plainText);
-            
             setConversionStatus("PASTE FALLBACK: PLAIN TEXT");
             setTimeout(() => setConversionStatus(null), 3000);
         }
-        return;
     }
   };
 
@@ -354,16 +226,14 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
   return (
     <div className="h-[calc(100vh-56px)] flex flex-col bg-zenith-bg relative">
       
-      {/* Toast Notification (Fixed Position) */}
+      {/* Toast Notification */}
       {conversionStatus && (
           <div className="fixed bottom-12 right-6 z-50 animate-in slide-in-from-bottom-5 duration-300">
               <div className="bg-zenith-surface border border-zenith-orange px-4 py-3 shadow-[0_0_15px_rgba(255,77,0,0.2)] flex items-center gap-3">
                   <div className="bg-zenith-orange text-black p-1">
                       <Icons.Zap size={14} />
                   </div>
-                  <span className="font-mono text-white font-bold text-xs tracking-widest uppercase">
-                      {conversionStatus}
-                  </span>
+                  <span className="font-mono text-white font-bold text-xs tracking-widest uppercase">{conversionStatus}</span>
               </div>
           </div>
       )}
@@ -376,7 +246,6 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
               </Link>
               <div className="h-6 w-px bg-zenith-border shrink-0"></div>
               
-              {/* Renaming Interface */}
               {isRenaming && isAuthenticated ? (
                   <input 
                     autoFocus
@@ -401,7 +270,6 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-             {/* Mode Switcher */}
              <div className="flex border border-zenith-border p-0.5 bg-zenith-surface">
                  <button 
                     onClick={() => setViewMode('write')}
@@ -435,10 +303,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
                  >
                     <Icons.Save size={14} /> <span className="hidden sm:inline">Save</span>
                  </button>
-                 
-                 <button onClick={() => setIsDeleteModalOpen(true)} className="p-2 text-zenith-muted hover:text-red-600 transition-colors">
-                     <Icons.Trash size={16} />
-                 </button>
+                 <button onClick={() => setIsDeleteModalOpen(true)} className="p-2 text-zenith-muted hover:text-red-600 transition-colors"><Icons.Trash size={16} /></button>
                 </>
              )}
           </div>
@@ -446,22 +311,13 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-hidden relative flex z-0">
-         
-         {/* Write Panel */}
          {(viewMode === 'write' || viewMode === 'split') && (
            <div className={`flex flex-col border-r border-zenith-border ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
-             {isAuthenticated && (
-                 <EditorToolbar 
-                    onInsert={handleInsert} 
-                    onLinkNote={() => setIsLinkSelectorOpen(true)} 
-                 />
-             )}
+             {isAuthenticated && <EditorToolbar onInsert={handleInsert} onLinkNote={() => setIsLinkSelectorOpen(true)} />}
              <div className="flex flex-1 overflow-hidden">
-                {/* Line Numbers */}
                 <div className="hidden sm:block w-10 bg-zenith-surface border-r border-zenith-border text-right py-4 pr-2 font-mono text-xs text-zenith-border select-none overflow-hidden shrink-0">
                     {Array.from({length: Math.max(lineCount, 20)}).map((_, i) => <div key={i}>{i+1}</div>)}
                 </div>
-                
                 <textarea
                     ref={textAreaRef}
                     readOnly={!isAuthenticated}
@@ -476,84 +332,20 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
            </div>
          )}
 
-         {/* Preview Panel Wrapper (Now Flex for Sidebar) */}
          {(viewMode === 'preview' || viewMode === 'split') && (
            <div className={`flex flex-1 overflow-hidden bg-zenith-bg ${viewMode === 'split' ? 'bg-[#080808]' : ''}`}>
-               
-               {/* Actual Preview Content */}
                <div className="flex-1 overflow-y-auto overflow-x-hidden">
                    <div className={`p-8 mx-auto ${viewMode === 'split' ? 'max-w-none' : 'max-w-4xl'}`}>
                        <MarkdownPreview content={content} />
-                       
-                       {/* Linked Mentions (Backlinks) Section */}
-                       {backlinks.length > 0 && (
-                           <div className="mt-16 pt-8 border-t border-zenith-border">
-                               <h3 className="text-sm font-mono font-bold text-zenith-muted uppercase tracking-widest mb-4 flex items-center gap-2">
-                                   <Icons.GitBranch size={14} /> Linked Mentions
-                               </h3>
-                               <div className="grid grid-cols-1 gap-3">
-                                   {backlinks.map((link, idx) => (
-                                       <div 
-                                            key={idx}
-                                            onClick={() => navigate(`/${link.repoId}/${link.fileId}`)}
-                                            className="group bg-zenith-surface border border-zenith-border p-4 cursor-pointer hover:border-zenith-orange transition-colors"
-                                       >
-                                           <div className="flex items-center justify-between mb-2">
-                                               <span className="text-white font-bold text-sm group-hover:text-zenith-orange transition-colors">
-                                                   {link.fileName}
-                                               </span>
-                                               <span className="text-[10px] text-zenith-muted font-mono bg-zenith-bg px-2 py-0.5 border border-zenith-border">
-                                                   {link.repoName}
-                                               </span>
-                                           </div>
-                                           <div className="text-zenith-muted text-xs font-mono line-clamp-2 border-l-2 border-zenith-border pl-2 group-hover:border-zenith-orange">
-                                               "...{link.context}..."
-                                           </div>
-                                       </div>
-                                   ))}
-                               </div>
-                           </div>
-                       )}
+                       <BacklinksPanel backlinks={backlinks} />
                    </div>
-                   {/* Bottom Spacer for comfortable reading */}
                    <div className="h-32"></div>
                </div>
-
-                {/* Outline Sidebar (Visible in Preview Mode mainly, or Split if room permits) */}
-                {viewMode === 'preview' && toc.length > 0 && (
-                    <div className="hidden xl:flex w-72 flex-col border-l border-zenith-border bg-zenith-bg/50 backdrop-blur-sm">
-                        <div className="p-4 border-b border-zenith-border font-mono text-[10px] tracking-widest text-zenith-muted uppercase flex items-center gap-2">
-                            <Icons.List size={12} />
-                            <span>Document Outline</span>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-1">
-                            {toc.map((item, idx) => (
-                                <a 
-                                    key={`${item.id}-${idx}`}
-                                    href={`#${item.id}`}
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' });
-                                    }}
-                                    className={`
-                                        block text-xs font-mono py-1.5 transition-colors duration-200 border-l-2 border-transparent hover:border-zenith-orange pl-3
-                                        ${item.level === 1 ? 'text-white font-bold' : 'text-zenith-muted hover:text-zenith-text'}
-                                        ${item.level === 2 ? 'ml-2' : ''}
-                                        ${item.level === 3 ? 'ml-4' : ''}
-                                    `}
-                                >
-                                    {item.text}
-                                </a>
-                            ))}
-                        </div>
-                    </div>
-                )}
+               {viewMode === 'preview' && <TableOfContents items={toc} />}
            </div>
          )}
-
       </div>
       
-      {/* Footer Info */}
       <div className="h-8 border-t border-zenith-border bg-zenith-surface flex items-center justify-between px-4 font-mono text-[10px] text-zenith-muted uppercase tracking-widest shrink-0">
          <div>Ln {lineCount}, Col {content.length}</div>
          <div>{isAuthenticated ? 'Markdown Environment' : 'Visitor View'}</div>

@@ -14,10 +14,9 @@ It is built on the **JAMstack** architecture. It requires **no VPS**, **no docke
 
 ## ⚡ Core Systems
 
-### 1. Data Visualization (Activity Matrix)
-*   **Thermal Grade Heatmap:** Visualize your writing frequency over the last year.
-*   **Pixel Art Mode:** "Hack" your timeline by drawing custom patterns (like 'CHINA' or 'Invaders') directly onto your contribution graph.
-*   **Responsive Scaling:** The matrix automatically adjusts its time horizon.
+### 1. Neural Constellation Engine (New in v3.1)
+*   **Sector View (Local):** Force-directed graph revealing the structural hierarchy of a single module. Automatically identifies "Sovereign" nodes (Hubs) and "Subject" nodes based on link density.
+*   **Galaxy View (Context-Aware):** A cross-repository visualization system. Unlike traditional "spaghetti" graphs that render everything at once, Zenith implements a **Gravity Well Algorithm**. It renders the active module in full detail, while selectively pulling in only relevant *external* nodes that have direct connections. This solves the "Graph Explosion" problem common in large knowledge bases.
 
 ### 2. Smart Editor Environment
 *   **Split-View & Render:** Toggle between raw Markdown, split-pane, or pure preview.
@@ -25,7 +24,11 @@ It is built on the **JAMstack** architecture. It requires **no VPS**, **no docke
 *   **Smart Paste:** Pasting HTML/Web content automatically converts it to clean Markdown.
 *   **Zenith UI:** A custom "Void Black" & "International Orange" theme engine with switchable "Matrix Green" and "Holo Blue" modes.
 
-### 3. Cloud Synchronization (Uplink)
+### 3. Data Visualization
+*   **Thermal Grade Heatmap:** Visualize your writing frequency over the last year.
+*   **Pixel Art Mode:** "Hack" your timeline by drawing custom patterns (like 'CHINA' or 'Invaders') directly onto your contribution graph.
+
+### 4. Cloud Synchronization (Uplink)
 *   **Supabase Backend:** Real-time persistence via PostgreSQL.
 *   **Anonymous Auth:** Zero-knowledge identity via cryptographic keys.
 

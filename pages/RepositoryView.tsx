@@ -161,8 +161,8 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
         
         {isAuthenticated && (
           <div className="flex items-center gap-4">
-              {/* View Toggle */}
-              <div className="flex border border-zenith-border p-0.5 bg-zenith-surface mr-4">
+              {/* View Toggle (Hidden on Mobile) */}
+              <div className="hidden md:flex border border-zenith-border p-0.5 bg-zenith-surface mr-4">
                  <button 
                     onClick={() => setViewMode('list')}
                     className={`px-3 py-2 text-xs font-mono uppercase transition-all flex items-center gap-2 ${viewMode === 'list' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'}`}
@@ -224,7 +224,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
 
       {/* Main Content Switcher */}
       {viewMode === 'graph' ? (
-          <div className="border border-zenith-border bg-zenith-surface/20 animate-in fade-in duration-500 relative">
+          <div className="border border-zenith-border bg-zenith-surface/20 animate-in fade-in duration-500 relative hidden md:block">
              
              {/* Scope Toggle (Floating inside Graph) */}
              <div className="absolute top-4 left-4 z-20 flex gap-2">
@@ -307,6 +307,20 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
                     </div>
                 )}
               </div>
+          </div>
+      )}
+      
+      {/* Mobile Fallback for Graph Mode Persistence */}
+      {viewMode === 'graph' && (
+          <div className="md:hidden border border-zenith-border bg-zenith-surface/10 p-8 text-center">
+              <div className="text-zenith-orange font-mono text-xs uppercase tracking-widest mb-2">Display Error</div>
+              <div className="text-zenith-muted text-xs">Constellation View is not available on mobile interfaces.</div>
+              <button 
+                onClick={() => setViewMode('list')}
+                className="mt-4 bg-zenith-surface border border-zenith-border px-4 py-2 text-xs font-mono text-white hover:border-white uppercase"
+              >
+                  Return to List View
+              </button>
           </div>
       )}
 
