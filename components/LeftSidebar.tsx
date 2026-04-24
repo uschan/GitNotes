@@ -99,16 +99,6 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
                 <Icons.Layout size={14} />
                 <span>Dashboard</span>
             </NavLink>
-            <NavLink 
-                to="/graph" 
-                className={({ isActive }) => clsx(
-                    "flex items-center gap-3 px-3 py-2 text-xs font-mono tracking-widest uppercase rounded transition-colors group",
-                    isActive ? "bg-zenith-orange text-black font-bold" : "text-zenith-muted hover:text-white hover:bg-zenith-light/20"
-                )}
-            >
-                <Icons.Network size={14} />
-                <span>Constellation</span>
-            </NavLink>
 
             {/* Quick Capture Trigger */}
             <button 
@@ -116,13 +106,13 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
                    const event = new KeyboardEvent('keydown', { key: 'n', altKey: true });
                    window.dispatchEvent(event);
                 }}
-                className="w-full flex items-center justify-between px-3 py-2 text-xs font-mono tracking-widest uppercase text-zenith-muted hover:text-white hover:bg-zenith-orange/10 rounded transition-colors group border border-transparent hover:border-zenith-orange/30"
+                className="w-full flex items-center justify-between px-3 py-2 text-xs font-mono tracking-widest uppercase text-zenith-muted hover:text-white hover:bg-zenith-orange/10 rounded transition-colors group border border-transparent hover:border-zenith-orange/30 mt-2"
             >
                 <div className="flex items-center gap-3">
                     <Icons.Zap size={14} className="text-zenith-orange animate-pulse" />
-                    <span>Quick Inject</span>
+                    <span className="font-bold">Quick Inject</span>
                 </div>
-                <span className="text-[9px] opacity-40 group-hover:opacity-100 transition-opacity">ALT+N</span>
+                <span className="text-[9px] opacity-40 group-hover:opacity-100 transition-opacity hidden sm:inline">ALT+N</span>
             </button>
         </div>
 
