@@ -1,12 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import Header from './components/Header';
+import LeftSidebar from './components/LeftSidebar';
+import FileListPanel from './components/FileListPanel';
+import TabBar, { Tab } from './components/TabBar';
 import Dashboard from './pages/Dashboard';
 import RepositoryView from './pages/RepositoryView';
 import FileEditor from './pages/FileEditor';
+import GlobalGraph from './pages/GlobalGraph';
 import AccessGate from './components/AccessGate';
 import SocialBar from './components/SocialBar';
 import GlobalSearch from './components/GlobalSearch';
+import QuickCapture from './components/QuickCapture';
+import SystemSettingsModal from './components/SystemSettingsModal';
 import { api } from './services/dataService';
 import { Repository } from './types';
 import { Icons } from './components/Icon';
@@ -26,6 +32,41 @@ function App() {
       return (localStorage.getItem('gitnotes_theme') as Theme) || 'orange';
   });
 
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Manage Tabs based on route
+  useEffect(() => {
+    const parts = location.pathname.split('/').filter(Boolean);
+    if (parts.length === 2) {
+      const [repoId, fileId] = parts;
+      const repo = repos.find(r => r.id === repoId);
+      const file = repo?.files.find(f => f.id === fileId);
+      
+      if (file && !tabs.find(t => t.fileId === fileId)) {
+        setTabs(prev => [...prev, { repoId, fileId, name: file.name }]);
+      }
+    }
+  }, [location.pathname, repos, tabs]);
+
+  const handleCloseTab = (e: React.MouseEvent, fileId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const newTabs = tabs.filter(t => t.fileId !== fileId);
+    setTabs(newTabs);
+    
+    // If we closed the active tab, navigate to the last remaining tab or home
+    if (location.pathname.includes(fileId)) {
+      if (newTabs.length > 0) {
+        const lastTab = newTabs[newTabs.length - 1];
+        navigate(`/${lastTab.repoId}/${lastTab.fileId}`);
+      } else {
+        navigate('/');
+      }
+    }
+  };
+
   // Apply Theme
   useEffect(() => {
       document.documentElement.setAttribute('data-theme', theme);
@@ -34,6 +75,9 @@ function App() {
   
   // New Modals
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Load Data function
   const loadData = useCallback(async (key: string) => {
@@ -74,12 +118,26 @@ function App() {
       if (secretKey) loadData(secretKey);
   };
 
-  // Global Key Listener for Search
+  // Global Key Listener for Search & Quick Capture
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+K for Search
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         if (secretKey) setIsSearchOpen(true);
+      }
+      
+      // Alt+N for Quick Capture
+      if (e.altKey && e.key === 'n') {
+        e.preventDefault();
+        if (secretKey) setIsQuickCaptureOpen(true);
+      }
+
+      // Escape to close all modals
+      if (e.key === 'Escape') {
+        setIsSearchOpen(false);
+        setIsQuickCaptureOpen(false);
+        setIsSettingsOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -212,6 +270,12 @@ function App() {
       }));
   }
 
+  const handleImport = (importedRepos: Repository[]) => {
+      setRepos(importedRepos);
+      // In a real app, you would also sync this to Supabase, 
+      // but for now we just update the local state for session persistence.
+  };
+
   // --- Pixel Art Logic ---
   const handlePixelArt = async (date: string) => {
       if (!secretKey) return;
@@ -264,93 +328,135 @@ function App() {
       return <AccessGate onUnlock={handleUnlock} />;
   }
 
+  const repoIdInPath = location.pathname.split('/').filter(Boolean)[0];
+
   return (
-    <Router>
-      <div className="min-h-screen bg-zenith-bg text-zenith-text font-sans selection:bg-zenith-orange selection:text-black">
+    <div className="flex h-screen bg-zenith-bg text-zenith-text font-sans overflow-hidden selection:bg-zenith-orange selection:text-black">
+      <LeftSidebar 
+          repos={repos} 
+          currentRepoId={repoIdInPath || undefined} 
+          onCreateRepo={handleCreateRepo}
+          onSync={handleSync}
+          isLoading={loading}
+          isSearchOpen={isSearchOpen}
+          setIsSearchOpen={setIsSearchOpen}
+          isSettingsOpen={isSettingsOpen}
+          setIsSettingsOpen={setIsSettingsOpen}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => setIsMobileSidebarOpen(false)}
+      />
+
+      {repoIdInPath && (
+          <FileListPanel 
+              repos={repos}
+              onAddFile={handleAddFile}
+          />
+      )}
+
+      <div className="flex-1 flex flex-col min-w-0 relative">
         <Header 
             secretKey={secretKey}
             onLogoutClick={handleLogout}
-        />
-        
-        <Routes>
-          <Route 
-            path="/" 
-            element={
-                <Dashboard 
-                    repos={repos} 
-                    onCreateRepo={handleCreateRepo} 
-                    onQuickSave={handleQuickSave}
-                    onSync={handleSync}
-                    isLoading={loading}
-                    onPixelArt={handlePixelArt}
-                />
-            } 
-          />
-          <Route 
-            path="/:repoId" 
-            element={
-                <RepositoryView 
-                    repos={repos} 
-                    onAddFile={handleAddFile}
-                    onDeleteRepo={handleDeleteRepo}
-                    onUpdateRepo={handleUpdateRepo}
-                    onUpdateFile={handleUpdateFile}
-                    isAuthenticated={true} 
-                />
-            } 
-          />
-          <Route 
-            path="/:repoId/:fileId" 
-            element={
-                <FileEditor 
-                    repos={repos} 
-                    onUpdateFile={handleUpdateFile}
-                    onRenameFile={handleRenameFile} 
-                    onDeleteFile={handleDeleteFile}
-                    isAuthenticated={true}
-                />
-            } 
-          />
-        </Routes>
-
-        <footer className="mt-20 py-12 border-t border-zenith-border flex flex-col items-center gap-6 bg-zenith-bg/50">
-            <SocialBar />
-
-            {/* Theme Switcher */}
-            <div className="flex items-center gap-4 bg-zenith-surface border border-zenith-border rounded-full px-4 py-2">
-                <button 
-                    onClick={() => setTheme('orange')} 
-                    className={`w-3 h-3 rounded-full bg-[#FF4D00] transition-all duration-300 ${theme === 'orange' ? 'ring-2 ring-white scale-110 shadow-[0_0_10px_#FF4D00]' : 'opacity-40 hover:opacity-100 hover:scale-110'}`}
-                    title="Zenith Orange"
-                ></button>
-                <button 
-                    onClick={() => setTheme('green')} 
-                    className={`w-3 h-3 rounded-full bg-[#00FF94] transition-all duration-300 ${theme === 'green' ? 'ring-2 ring-white scale-110 shadow-[0_0_10px_#00FF94]' : 'opacity-40 hover:opacity-100 hover:scale-110'}`}
-                    title="Matrix Green"
-                ></button>
-                <button 
-                    onClick={() => setTheme('blue')} 
-                    className={`w-3 h-3 rounded-full bg-[#38BDF8] transition-all duration-300 ${theme === 'blue' ? 'ring-2 ring-white scale-110 shadow-[0_0_10px_#38BDF8]' : 'opacity-40 hover:opacity-100 hover:scale-110'}`}
-                    title="Holo Blue"
-                ></button>
-            </div>
-            
-            <div className="text-[10px] tracking-widest text-zenith-muted font-mono uppercase flex items-center gap-4 opacity-60 hover:opacity-100 transition-opacity">
-                <span className="text-zenith-green">WildSalt.Lab</span>
-                <span className="w-px h-3 bg-zenith-muted"></span>
-                <button onClick={() => setIsSearchOpen(true)} className="hover:text-white flex items-center gap-1"><Icons.Command size={10}/> CMD+K</button>
-                <span className="w-px h-3 bg-zenith-muted"></span>
-                <span className="">Ver: 3.1.0</span>
-            </div>
-        </footer>
-        
-        <GlobalSearch 
-            isOpen={isSearchOpen}
-            onClose={() => setIsSearchOpen(false)}
             repos={repos}
+            toggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         />
+
+        <TabBar 
+            tabs={tabs}
+            onCloseTab={handleCloseTab}
+        />
+        
+        <main className="flex-1 overflow-y-auto custom-scrollbar">
+          <Routes>
+              <Route 
+                path="/" 
+                element={
+                    <Dashboard 
+                        repos={repos} 
+                        onCreateRepo={handleCreateRepo} 
+                        onQuickSave={handleQuickSave}
+                        onSync={handleSync}
+                        isLoading={loading}
+                        onPixelArt={handlePixelArt}
+                    />
+                } 
+              />
+              <Route 
+                path="/graph" 
+                element={
+                    <GlobalGraph 
+                        repos={repos} 
+                    />
+                } 
+              />
+              <Route 
+                path="/:repoId" 
+                element={
+                    <RepositoryView 
+                        repos={repos} 
+                        onAddFile={handleAddFile}
+                        onDeleteRepo={handleDeleteRepo}
+                        onUpdateRepo={handleUpdateRepo}
+                        onUpdateFile={handleUpdateFile}
+                        isAuthenticated={true} 
+                    />
+                } 
+              />
+              <Route 
+                path="/:repoId/:fileId" 
+                element={
+                    <FileEditor 
+                        repos={repos} 
+                        onUpdateFile={handleUpdateFile}
+                        onRenameFile={handleRenameFile} 
+                        onDeleteFile={handleDeleteFile}
+                        isAuthenticated={true}
+                    />
+                } 
+              />
+            </Routes>
+        </main>
+
+        {/* Compact Overlay Utility Bar (Theme) */}
+        <div className="absolute bottom-6 right-6 flex items-center gap-3 z-30">
+          <div className="flex items-center gap-3 bg-zenith-surface/80 backdrop-blur-md border border-zenith-border rounded-full px-3 py-1.5 shadow-xl shadow-black/50">
+              <button 
+                  onClick={() => setTheme('orange')} 
+                  className={`w-2.5 h-2.5 rounded-full bg-[#FF4D00] transition-all ${theme === 'orange' ? 'ring-1 ring-white scale-110' : 'opacity-40 hover:opacity-100'}`}
+              ></button>
+              <button 
+                  onClick={() => setTheme('green')} 
+                  className={`w-2.5 h-2.5 rounded-full bg-[#00FF94] transition-all ${theme === 'green' ? 'ring-1 ring-white scale-110' : 'opacity-40 hover:opacity-100'}`}
+              ></button>
+              <button 
+                  onClick={() => setTheme('blue')} 
+                  className={`w-2.5 h-2.5 rounded-full bg-[#38BDF8] transition-all ${theme === 'blue' ? 'ring-1 ring-white scale-110' : 'opacity-40 hover:opacity-100'}`}
+              ></button>
+          </div>
+        </div>
       </div>
-    </Router>
+      
+      <GlobalSearch 
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          repos={repos}
+      />
+
+      <QuickCapture 
+          isOpen={isQuickCaptureOpen}
+          onClose={() => setIsQuickCaptureOpen(false)}
+          repos={repos}
+          onQuickSave={handleQuickSave}
+          onCreateRepo={handleCreateRepo}
+      />
+
+      <SystemSettingsModal 
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          repos={repos}
+          onImport={handleImport}
+      />
+    </div>
   );
 }
 

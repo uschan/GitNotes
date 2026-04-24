@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BaseEdge, EdgeLabelRenderer, EdgeProps, getSmoothStepPath } from '@xyflow/react';
+import { BaseEdge, EdgeLabelRenderer, EdgeProps, getBezierPath } from '@xyflow/react';
 
 export const CustomDeleteEdge = ({
   id,
@@ -12,18 +12,18 @@ export const CustomDeleteEdge = ({
   style = {},
   markerEnd,
   data,
+  selected,
 }: EdgeProps) => {
   const [isHovered, setIsHovered] = useState(false);
   
   const baseColor = style.stroke?.toString() || '#27272A';
   
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
+  const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
     sourcePosition,
     targetX,
     targetY,
-    targetPosition,
   });
 
   const onEdgeClick = (evt: React.MouseEvent, id: string) => {
@@ -35,52 +35,56 @@ export const CustomDeleteEdge = ({
 
   const markerEndSafe = typeof markerEnd === 'object' ? markerEnd : {};
 
-  // Delete State (Red)
+  // Nebula Active State (Glow)
   const activeStyle = {
       ...style,
-      stroke: '#ef4444', 
-      strokeWidth: 2,
-      strokeDasharray: 'none', 
-      filter: 'drop-shadow(0 0 3px rgba(239, 68, 68, 0.6))',
-      transition: 'all 0.3s ease',
-      zIndex: 100
-  };
-
-  // Normal State
-  const defaultStyle = {
-      ...style,
-      opacity: 0.8,
+      stroke: isHovered ? '#ff4d00' : baseColor, 
+      strokeWidth: isHovered ? 2 : 1,
+      opacity: isHovered ? 1 : 0.4,
+      filter: isHovered ? 'drop-shadow(0 0 5px rgba(255, 77, 0, 0.8))' : 'none',
       transition: 'all 0.3s ease',
   };
 
   return (
     <>
-      <BaseEdge path={edgePath} markerEnd={{...markerEndSafe, color: isHovered ? '#ef4444' : baseColor} as any} style={isHovered ? activeStyle : defaultStyle} />
+      <BaseEdge 
+        path={edgePath} 
+        markerEnd={{...markerEndSafe, color: isHovered ? '#ff4d00' : baseColor} as any} 
+        style={activeStyle} 
+      />
+      
+      {/* Invisible thicker interaction edge for easier hovering */}
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={15}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className="cursor-pointer"
+      />
+
       <EdgeLabelRenderer>
         <div
           style={{
             position: 'absolute',
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            fontSize: 12,
+            fontSize: 10,
             pointerEvents: 'all',
           }}
-          className="nodrag nopan group flex flex-col items-center justify-center"
+          className="nodrag nopan group"
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
         >
-          {/* Interaction Zone - Only visible on hover */}
-          <button
-            className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-200 border shadow-lg ${
-                isHovered 
-                ? 'bg-red-600 text-white border-red-500 scale-110 opacity-100' 
-                : 'bg-black border-zenith-border opacity-0 group-hover:opacity-100 scale-90'
-            }`}
-            style={{ color: isHovered ? 'white' : baseColor }}
-            onClick={(event) => onEdgeClick(event, id)}
-            title="Sever Connection"
-          >
-            <span className="leading-none mb-[1px] font-bold">×</span>
-          </button>
+          {isHovered && (
+            <button
+              className="w-5 h-5 bg-black border border-red-500 text-red-500 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-lg animate-in zoom-in duration-200"
+              onClick={(event) => onEdgeClick(event, id)}
+              title="Disconnect"
+            >
+              <span className="font-bold">×</span>
+            </button>
+          )}
         </div>
       </EdgeLabelRenderer>
     </>

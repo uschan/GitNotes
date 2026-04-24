@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Repository } from '../types';
 import { Icons } from '../components/Icon';
 import MarkdownPreview, { generateSlug } from '../components/MarkdownPreview';
@@ -7,8 +7,9 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import EditorToolbar from '../components/EditorToolbar';
 import LinkSelectorModal from '../components/LinkSelectorModal';
 import { convertHtmlToMarkdown } from '../utils/markdownPaste';
-import BacklinksPanel from '../components/Editor/BacklinksPanel';
+import PropertiesPanel from '../components/Editor/PropertiesPanel';
 import TableOfContents, { TocItem } from '../components/Editor/TableOfContents';
+import { clsx } from 'clsx';
 
 interface FileEditorProps {
   repos: Repository[];
@@ -28,16 +29,18 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
   const repo = repos.find(r => r.id === repoId);
   const file = repo?.files.find(f => f.id === fileId);
 
-  const [viewMode, setViewMode] = useState<ViewMode>('preview');
+  const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [content, setContent] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [conversionStatus, setConversionStatus] = useState<string | null>(null);
   const [isLinkSelectorOpen, setIsLinkSelectorOpen] = useState(false);
+  const [isMetaOpen, setIsMetaOpen] = useState(window.innerWidth >= 1024);
 
   // Renaming State
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
 
   useEffect(() => {
     if (file) {
@@ -45,6 +48,39 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
       setRenameValue(file.name);
     }
   }, [file]);
+
+  // Adjust viewMode for mobile automatically
+  useEffect(() => {
+    const handleResize = () => {
+        if (window.innerWidth < 1024 && viewMode === 'split') {
+            setViewMode('write');
+        }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [viewMode]);
+
+  // --- Auto-save Logic ---
+  useEffect(() => {
+    if (!hasChanges || !isAuthenticated) return;
+    
+    setIsAutoSaving(true);
+    const timer = setTimeout(() => {
+      onUpdateFile(repoId!, fileId!, content);
+      setHasChanges(false);
+      setIsAutoSaving(false);
+      
+      // Feedback
+      setConversionStatus("RECORDS SYNCED");
+      setTimeout(() => setConversionStatus(null), 2000);
+    }, 4000);
+
+    return () => {
+      clearTimeout(timer);
+      setIsAutoSaving(false);
+    };
+  }, [content, hasChanges, isAuthenticated, repoId, fileId, onUpdateFile]);
 
   // --- Backlinks Logic ---
   const backlinks = useMemo(() => {
@@ -104,7 +140,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
   }, [content]);
 
   if (!repo || !file) {
-    return <div className="h-screen flex items-center justify-center font-mono text-zenith-orange">ERROR: FILE DATA CORRUPTED OR MISSING</div>;
+    return <div className="h-screen flex items-center justify-center font-mono text-zenith-orange uppercase tracking-widest">Error: Access Denied or Missing Record</div>;
   }
 
   const handleSave = () => {
@@ -224,7 +260,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
   const lineCount = content.split('\n').length;
 
   return (
-    <div className="h-[calc(100vh-56px)] flex flex-col bg-zenith-bg relative">
+    <div className="flex flex-col h-[calc(100vh-112px)] lg:h-[calc(100vh-56px)] bg-zenith-bg relative overflow-hidden">
       
       {/* Toast Notification */}
       {conversionStatus && (
@@ -239,83 +275,116 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
       )}
 
       {/* File Toolbar */}
-      <div className="h-14 border-b border-zenith-border bg-zenith-bg flex items-center justify-between px-4 sm:px-6 shrink-0 relative z-10 gap-2">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-              <Link to={`/${repoId}`} className="text-zenith-muted hover:text-white transition-colors shrink-0">
-                  <Icons.ChevronRight className="rotate-180" size={18} />
-              </Link>
-              <div className="h-6 w-px bg-zenith-border shrink-0"></div>
-              
+      <div className="min-h-[3.5rem] border-b border-zenith-border bg-zenith-bg flex flex-col md:flex-row md:items-center justify-between px-4 sm:px-6 shrink-0 relative z-10 gap-4 py-3 md:py-0">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 w-full md:w-auto">
               {isRenaming && isAuthenticated ? (
-                  <input 
-                    autoFocus
-                    type="text"
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onBlur={handleRenameSubmit}
-                    onKeyDown={(e) => e.key === 'Enter' && handleRenameSubmit()}
-                    className="bg-black border border-zenith-orange text-white font-mono text-sm font-bold tracking-wide px-2 py-1 outline-none min-w-[200px]"
-                  />
+                  <div className="flex items-center gap-2 w-full max-w-sm">
+                      <input 
+                        autoFocus
+                        type="text"
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onBlur={handleRenameSubmit}
+                        onKeyDown={(e) => e.key === 'Enter' && handleRenameSubmit()}
+                        className="bg-black border border-zenith-orange text-white font-mono text-sm font-bold tracking-wide px-2 py-1 outline-none w-full"
+                      />
+                  </div>
               ) : (
-                  <div className="flex items-center gap-2 group cursor-pointer" onClick={() => isAuthenticated && setIsRenaming(true)}>
+                  <div className="flex items-center gap-2 group cursor-pointer min-w-0" onClick={() => isAuthenticated && setIsRenaming(true)}>
                     <span className="font-mono text-sm text-white font-bold tracking-wide truncate group-hover:text-zenith-orange transition-colors" title={file.name}>
                         {file.name}
                     </span>
-                    {isAuthenticated && <Icons.Edit size={12} className="text-zenith-border group-hover:text-zenith-orange opacity-0 group-hover:opacity-100 transition-all"/>}
+                    {isAuthenticated && <Icons.Edit size={12} className="text-zenith-border group-hover:text-zenith-orange opacity-0 group-hover:opacity-100 transition-all shrink-0"/>}
                   </div>
               )}
 
-              {hasChanges && <span className="text-[10px] bg-zenith-orange text-black px-2 py-0.5 font-bold font-mono shrink-0">UNSAVED</span>}
+              {hasChanges && <span className="text-[9px] bg-zenith-orange text-black px-1.5 py-0.5 font-bold font-mono shrink-0">UNSAVED</span>}
               {!isAuthenticated && <span className="text-[10px] border border-zenith-border text-zenith-muted px-2 py-0.5 font-mono uppercase shrink-0 hidden sm:block">Read Only</span>}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-             <div className="flex border border-zenith-border p-0.5 bg-zenith-surface">
-                 <button 
-                    onClick={() => setViewMode('write')}
-                    className={`px-3 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all flex items-center gap-2 ${viewMode === 'write' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'}`}
-                    title="Write Mode"
-                 >
-                    <Icons.Edit size={12} /> <span className="hidden sm:inline">Write</span>
-                 </button>
-                 <button 
-                    onClick={() => setViewMode('split')}
-                    className={`px-3 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all flex items-center gap-2 border-l border-r border-zenith-border ${viewMode === 'split' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'}`}
-                    title="Split View"
-                 >
-                    <Icons.Layout size={12} /> <span className="hidden sm:inline">Split</span>
-                 </button>
-                 <button 
-                    onClick={() => setViewMode('preview')}
-                    className={`px-3 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all flex items-center gap-2 ${viewMode === 'preview' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'}`}
-                    title="Preview Mode"
-                 >
-                    <Icons.File size={12} /> <span className="hidden sm:inline">Render</span>
-                 </button>
-             </div>
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 w-full md:w-auto justify-between md:justify-end">
+             <div className="flex border border-zenith-border p-0.5 bg-zenith-surface rounded overflow-hidden">
+                  <button 
+                     onClick={() => setViewMode('write')}
+                     className={clsx(
+                         "px-3 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all flex items-center gap-2",
+                         viewMode === 'write' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'
+                     )}
+                     title="Write Mode"
+                  >
+                     <Icons.Edit size={12} /> <span className="hidden sm:inline">Write</span>
+                  </button>
+                  <button 
+                     onClick={() => setViewMode('split')}
+                     className={clsx(
+                         "hidden lg:flex px-3 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all flex items-center gap-2 border-l border-r border-zenith-border",
+                         viewMode === 'split' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'
+                     )}
+                     title="Split View"
+                  >
+                     <Icons.Layout size={12} /> <span className="hidden sm:inline">Split</span>
+                  </button>
+                  <button 
+                     onClick={() => setViewMode('preview')}
+                     className={clsx(
+                         "px-3 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all flex items-center gap-2",
+                         viewMode === 'preview' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white',
+                         (viewMode === 'split') && "lg:border-l-0 border-l border-zenith-border"
+                     )}
+                     title="Preview Mode"
+                  >
+                     <Icons.File size={12} /> <span className="hidden sm:inline">Render</span>
+                  </button>
+              </div>
 
-             {isAuthenticated && (
-                <>
-                 <button 
-                    onClick={handleSave}
-                    disabled={!hasChanges}
-                    className={`flex items-center gap-2 px-4 py-2 border text-xs font-mono tracking-widest uppercase transition-colors ${hasChanges ? 'border-zenith-orange text-zenith-orange hover:bg-zenith-orange hover:text-black' : 'border-zenith-border text-zenith-muted cursor-not-allowed'}`}
-                 >
-                    <Icons.Save size={14} /> <span className="hidden sm:inline">Save</span>
-                 </button>
-                 <button onClick={() => setIsDeleteModalOpen(true)} className="p-2 text-zenith-muted hover:text-red-600 transition-colors"><Icons.Trash size={16} /></button>
-                </>
-             )}
+              {isAuthenticated && (
+                 <div className="flex items-center gap-2">
+                  <button 
+                     onClick={() => setIsMetaOpen(!isMetaOpen)}
+                     className={clsx(
+                         "p-2 transition-colors",
+                         isMetaOpen ? 'text-zenith-orange' : 'text-zenith-muted hover:text-white'
+                     )}
+                     title="Toggle Information Panel"
+                  >
+                     <Icons.Info size={16} />
+                  </button>
+                  <div className="h-4 w-px bg-zenith-border mx-1 hidden sm:block"></div>
+                  <button 
+                     onClick={handleSave}
+                     disabled={!hasChanges || isAutoSaving}
+                     className={clsx(
+                         "flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 border text-[9px] sm:text-[10px] font-mono tracking-widest uppercase transition-colors shrink-0",
+                         hasChanges ? 'border-zenith-orange text-zenith-orange hover:bg-zenith-orange hover:text-black shadow-[0_0_10px_rgba(255,77,0,0.2)]' : 'border-zenith-border text-zenith-muted cursor-not-allowed'
+                     )}
+                  >
+                     {isAutoSaving ? (
+                        <>
+                            <Icons.RefreshCw size={12} className="animate-spin" /> <span className="hidden xs:inline">Syncing</span>
+                        </>
+                     ) : (
+                        <>
+                            <Icons.Save size={14} /> <span>{hasChanges ? 'Commit' : 'Synced'}</span>
+                        </>
+                     )}
+                  </button>
+                  <button onClick={() => setIsDeleteModalOpen(true)} className="p-2 text-zenith-muted hover:text-red-600 transition-colors hidden sm:block"><Icons.Trash size={16} /></button>
+                 </div>
+              )}
           </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-hidden relative flex z-0">
+      <div className="flex-1 overflow-hidden relative flex flex-col lg:flex-row z-0">
          {(viewMode === 'write' || viewMode === 'split') && (
-           <div className={`flex flex-col border-r border-zenith-border ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
+           <div className={clsx(
+               "flex flex-col border-r border-zenith-border",
+               viewMode === 'split' ? 'lg:w-1/2 w-full' : 'w-full',
+               viewMode === 'split' && 'max-lg:hidden'
+           )}>
              {isAuthenticated && <EditorToolbar onInsert={handleInsert} onLinkNote={() => setIsLinkSelectorOpen(true)} />}
-             <div className="flex flex-1 overflow-hidden">
-                <div className="hidden sm:block w-10 bg-zenith-surface border-r border-zenith-border text-right py-4 pr-2 font-mono text-xs text-zenith-border select-none overflow-hidden shrink-0">
+             <div className="flex-1 flex overflow-hidden">
+                <div className="hidden md:block w-10 bg-zenith-surface border-r border-zenith-border text-right py-4 pr-2 font-mono text-xs text-zenith-border select-none overflow-hidden shrink-0">
                     {Array.from({length: Math.max(lineCount, 20)}).map((_, i) => <div key={i}>{i+1}</div>)}
                 </div>
                 <textarea
@@ -324,7 +393,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
                     value={content}
                     onChange={(e) => handleContentChange(e.target.value)}
                     onPaste={handlePaste}
-                    className={`w-full h-full bg-zenith-bg text-zenith-text font-mono text-sm p-4 resize-none outline-none transition-colors leading-relaxed ${!isAuthenticated ? 'cursor-not-allowed text-zenith-muted' : 'focus:bg-[#050505]'}`}
+                    className={`w-full h-full bg-zenith-bg text-zenith-text font-mono text-base sm:text-sm p-6 sm:p-4 resize-none outline-none transition-colors leading-relaxed ${!isAuthenticated ? 'cursor-not-allowed text-zenith-muted' : 'focus:bg-[#050505]'}`}
                     spellCheck={false}
                     placeholder={!isAuthenticated ? "Editing is disabled in visitor mode." : "Start typing... Tip: Type '[[' to link another note."}
                 />
@@ -333,16 +402,35 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
          )}
 
          {(viewMode === 'preview' || viewMode === 'split') && (
-           <div className={`flex flex-1 overflow-hidden bg-zenith-bg ${viewMode === 'split' ? 'bg-[#080808]' : ''}`}>
-               <div className="flex-1 overflow-y-auto overflow-x-hidden">
-                   <div className={`p-8 mx-auto ${viewMode === 'split' ? 'max-w-none' : 'max-w-4xl'}`}>
+           <div className={clsx(
+               "flex flex-1 overflow-hidden bg-zenith-bg",
+               viewMode === 'split' ? 'bg-[#080808]' : '',
+               viewMode === 'split' && 'max-lg:w-full'
+           )}>
+               <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
+                   <div className={clsx("p-6 sm:p-8 mx-auto", viewMode === 'split' ? 'p-6' : 'max-w-4xl')}>
                        <MarkdownPreview content={content} />
-                       <BacklinksPanel backlinks={backlinks} />
                    </div>
                    <div className="h-32"></div>
                </div>
-               {viewMode === 'preview' && <TableOfContents items={toc} />}
+               {viewMode === 'preview' && !isMetaOpen && <div className="hidden lg:block"><TableOfContents items={toc} /></div>}
            </div>
+         )}
+
+         {isMetaOpen && (
+             <>
+                {/* Mobile Backdrop */}
+                <div 
+                    className="fixed inset-0 bg-black/60 backdrop-blur-[1px] z-[55] lg:hidden animate-in fade-in duration-300" 
+                    onClick={() => setIsMetaOpen(false)}
+                />
+                <PropertiesPanel 
+                    file={file}
+                    repoName={repo.name}
+                    backlinks={backlinks}
+                    onClose={() => setIsMetaOpen(false)}
+                />
+             </>
          )}
       </div>
       

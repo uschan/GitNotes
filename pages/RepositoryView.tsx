@@ -41,6 +41,18 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
+  // Adjust viewMode for mobile automatically
+  React.useEffect(() => {
+    const handleResize = () => {
+        if (window.innerWidth < 768 && viewMode === 'graph') {
+            setViewMode('list');
+        }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [viewMode]);
+
   if (!repo) {
     return <div className="h-screen flex items-center justify-center font-mono text-zenith-orange">ERROR: MODULE NOT FOUND</div>;
   }
@@ -224,7 +236,7 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
 
       {/* Main Content Switcher */}
       {viewMode === 'graph' ? (
-          <div className="border border-zenith-border bg-zenith-surface/20 animate-in fade-in duration-500 relative hidden md:block">
+          <div className="flex-1 border border-zenith-border bg-zenith-surface/20 relative hidden md:block overflow-hidden">
              
              {/* Scope Toggle (Floating inside Graph) */}
              <div className="absolute top-4 left-4 z-20 flex gap-2">
@@ -252,58 +264,31 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
              />
           </div>
       ) : (
-          <div className="grid lg:grid-cols-3 gap-8 animate-in fade-in duration-300">
-              {/* File List Table */}
-              <div className="lg:col-span-2">
-                <div className="border border-zenith-border">
-                    <div className="bg-zenith-surface border-b border-zenith-border px-4 py-2 font-mono text-[10px] tracking-widest text-zenith-muted uppercase flex justify-between">
-                        <span>File Index</span>
-                        <span>Count: {repo.files.length}</span>
-                    </div>
-                    
-                    <div className="divide-y divide-zenith-border bg-black">
-                        {repo.files.map(file => (
-                            <div key={file.id} className="group flex items-center justify-between p-4 hover:bg-zenith-surface transition-colors duration-75">
-                                <div className="flex items-center gap-4">
-                                    <Icons.File size={16} className="text-zenith-muted group-hover:text-zenith-orange" />
-                                    <Link to={`/${repo.id}/${file.id}`} className="font-mono text-sm text-zenith-text group-hover:text-white group-hover:underline decoration-zenith-orange underline-offset-4">
-                                        {file.name}
-                                    </Link>
-                                </div>
-                                <div className="flex items-center gap-6">
-                                    <span className="font-mono text-[10px] text-zenith-muted hidden sm:block">
-                                        {(file.size / 1024).toFixed(2)} KB
-                                    </span>
-                                    <span className="font-mono text-[10px] text-zenith-muted">
-                                        {new Date(file.updatedAt).toLocaleDateString()}
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
-                        {repo.files.length === 0 && (
-                            <div className="p-8 text-center font-mono text-xs text-zenith-muted uppercase">
-                                No files detected in sector
-                            </div>
-                        )}
-                    </div>
-                </div>
-              </div>
-
-              {/* README Preview Panel */}
-              <div className="lg:col-span-1">
+          <div className="flex-1 animate-in fade-in duration-300 overflow-hidden flex flex-col">
+              {/* README Preview Panel - Full Width in Dashboard mode */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {readme ? (
-                    <div className="border border-zenith-border sticky top-20">
-                        <div className="bg-zenith-surface border-b border-zenith-border px-4 py-2 font-mono text-[10px] tracking-widest text-zenith-muted uppercase flex items-center gap-2">
+                    <div className="max-w-4xl mx-auto py-8 px-4">
+                        <div className="bg-zenith-surface border border-zenith-border mb-6 px-4 py-2 font-mono text-[10px] tracking-widest text-zenith-muted uppercase flex items-center gap-2">
                             <div className="w-2 h-2 bg-zenith-green rounded-full"></div>
-                            <span>Preview: README.md</span>
+                            <span>Project Overview: README.md</span>
                         </div>
-                        <div className="p-6 bg-zenith-bg max-h-[calc(100vh-200px)] overflow-y-auto">
+                        <div className="prose prose-invert prose-zenith max-w-none">
                             <MarkdownPreview content={readme.content} />
                         </div>
                     </div>
                 ) : (
-                    <div className="border border-zenith-border border-dashed p-8 text-center">
-                        <span className="font-mono text-xs text-zenith-muted">NO README DETECTED</span>
+                    <div className="flex-1 flex items-center justify-center border border-zenith-border border-dashed m-12 p-12 text-center">
+                        <div className="space-y-4">
+                            <Icons.FileText size={48} className="mx-auto text-zenith-muted opacity-20" />
+                            <p className="font-mono text-xs text-zenith-muted tracking-widest">NO README DETECTED IN SECTOR</p>
+                            <button 
+                                onClick={() => onAddFile(repo.id, 'README.md')}
+                                className="text-zenith-orange hover:underline font-mono text-[10px] uppercase tracking-widest"
+                            >
+                                Initialize Documentation
+                            </button>
+                        </div>
                     </div>
                 )}
               </div>

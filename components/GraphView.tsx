@@ -31,7 +31,7 @@ interface GraphViewProps {
 }
 
 const flowStyles = {
-    background: '#030303',
+    background: '#020202',
 };
 
 const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAddFile, onLinkNodes, onDisconnectNodes }) => {
@@ -44,6 +44,59 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
   const edgeTypes = useMemo(() => ({
     'custom-delete': CustomDeleteEdge,
   }), []);
+
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
+  // --- HIGHLIGHT LOGIC ---
+  const highlightedEdges = useMemo(() => {
+    if (!hoveredNodeId) return edges;
+    return edges.map(edge => ({
+        ...edge,
+        animated: edge.source === hoveredNodeId || edge.target === hoveredNodeId,
+        style: {
+            ...edge.style,
+            opacity: (edge.source === hoveredNodeId || edge.target === hoveredNodeId) ? 1 : 0.05,
+            stroke: (edge.source === hoveredNodeId || edge.target === hoveredNodeId) ? '#ff4d00' : (edge.style?.stroke || '#27272A'),
+            strokeWidth: (edge.source === hoveredNodeId || edge.target === hoveredNodeId) ? 2 : 1,
+        }
+    }));
+  }, [edges, hoveredNodeId]);
+
+  const highlightedNodes = useMemo(() => {
+    if (!hoveredNodeId) return nodes;
+    
+    // Find neighbors
+    const neighbors = new Set<string>();
+    edges.forEach(edge => {
+        if (edge.source === hoveredNodeId) neighbors.add(edge.target);
+        if (edge.target === hoveredNodeId) neighbors.add(edge.source);
+    });
+
+    return nodes.map(node => {
+        const isHovered = node.id === hoveredNodeId;
+        const isNeighbor = neighbors.has(node.id);
+        
+        return {
+            ...node,
+            style: {
+                ...node.style,
+                opacity: (isHovered || isNeighbor) ? 1 : 0.2,
+                scale: isHovered ? 1.05 : 1,
+                boxShadow: isHovered ? `0 0 30px #ff4d0040` : node.style?.boxShadow,
+                filter: (isHovered || isNeighbor) ? 'none' : 'grayscale(0.8) blur(2px)',
+                zIndex: isHovered ? 100 : (isNeighbor ? 50 : 1),
+            }
+        };
+    });
+  }, [nodes, edges, hoveredNodeId]);
+
+  const onNodeMouseEnter = (_: any, node: Node) => {
+    setHoveredNodeId(node.id);
+  };
+
+  const onNodeMouseLeave = () => {
+    setHoveredNodeId(null);
+  };
 
   // --- BUILD GRAPH ---
   useEffect(() => {
@@ -89,7 +142,7 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
   }, [onDisconnectNodes]);
 
   return (
-    <div className="w-full h-[calc(100vh-180px)] border border-zenith-border bg-zenith-bg relative group">
+    <div className="w-full h-[60vh] sm:h-[calc(100vh-180px)] border border-zenith-border bg-zenith-bg relative group overflow-hidden">
         
         {/* Graph Toolbar */}
         <div className="absolute top-4 right-4 z-10 flex gap-2">
@@ -125,19 +178,21 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
         )}
 
         <ReactFlow
-            nodes={nodes}
-            edges={edges}
+            nodes={highlightedNodes}
+            edges={highlightedEdges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onNodeClick={onNodeClick}
+            onNodeMouseEnter={onNodeMouseEnter}
+            onNodeMouseLeave={onNodeMouseLeave}
             onConnect={onConnect}
             onEdgesDelete={onEdgesDelete} 
             deleteKeyCode={['Backspace', 'Delete']} 
             edgeTypes={edgeTypes}
-            connectionLineType={ConnectionLineType.SmoothStep}
+            connectionLineType={ConnectionLineType.Bezier}
             fitView
             style={flowStyles}
-            minZoom={0.2}
+            minZoom={0.1}
             maxZoom={4}
             defaultEdgeOptions={{ 
                 type: 'custom-delete',

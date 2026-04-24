@@ -7,13 +7,14 @@ import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
 
 interface QuickCaptureProps {
+  isOpen: boolean;
+  onClose: () => void;
   repos: Repository[];
   onQuickSave: (repoId: string, title: string, content: string) => Promise<void>;
-  onCreateRepo: (name: string) => Promise<string | null>;
+  onCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<string | null>;
 }
 
-const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreateRepo }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+const QuickCapture: React.FC<QuickCaptureProps> = ({ isOpen, onClose, repos, onQuickSave, onCreateRepo }) => {
   const [content, setContent] = useState('');
   const [title, setTitle] = useState('');
   const [selectedRepoId, setSelectedRepoId] = useState('');
@@ -23,16 +24,30 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
   const [conversionStatus, setConversionStatus] = useState<string | null>(null);
   
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   // Auto-resize logic
   useEffect(() => {
-    if (textAreaRef.current && isExpanded) {
-        // Reset height to auto to correctly calculate shrink
+    if (textAreaRef.current && isOpen) {
         textAreaRef.current.style.height = 'auto';
-        // Set to scrollHeight
-        textAreaRef.current.style.height = `${textAreaRef.current.scrollHeight}px`;
+        textAreaRef.current.style.height = `${Math.min(textAreaRef.current.scrollHeight, 400)}px`;
     }
-  }, [content, isExpanded]);
+  }, [content, isOpen]);
+
+  // Click outside to close
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   const handleSave = async () => {
     if (!content.trim()) return;
@@ -41,24 +56,20 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
     try {
       let targetRepoId = selectedRepoId;
 
-      // Logic: If no repo selected, default to the first one, or create a 'General' one
       if (!targetRepoId && !isCreatingRepo) {
         if (repos.length > 0) {
           targetRepoId = repos[0].id;
         } else {
-            // Auto create general if absolutely no repos exist
-            const id = await onCreateRepo('general-notes');
+            const id = await onCreateRepo('general-notes', 'Default repository for quick notes', true);
             if (id) targetRepoId = id;
         }
       }
 
-      // Logic: If user opted to create new repo
       if (isCreatingRepo && newRepoName.trim()) {
-        const id = await onCreateRepo(newRepoName);
+        const id = await onCreateRepo(newRepoName, 'Created via Quick Capture', true);
         if (id) targetRepoId = id;
       }
 
-      // Generate Title if empty
       let finalTitle = title.trim();
       if (!finalTitle) {
          const dateStr = new Date().toISOString().split('T')[0];
@@ -69,16 +80,14 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
 
       if (targetRepoId) {
           await onQuickSave(targetRepoId, finalTitle, content);
-          // Reset
           setContent('');
           setTitle('');
-          setIsExpanded(false);
           setIsCreatingRepo(false);
           setNewRepoName('');
+          onClose(); // Close modal on success
       }
     } catch (e) {
         console.error("Capture failed", e);
-        alert("Transmission failed. Check network.");
     } finally {
         setIsSaving(false);
     }
@@ -201,128 +210,125 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ repos, onQuickSave, onCreat
   };
 
   return (
-    <div className={`mb-12 border transition-all duration-300 relative ${isExpanded ? 'bg-zenith-surface border-zenith-orange shadow-[0_0_20px_rgba(255,77,0,0.15)]' : 'bg-black border-zenith-border hover:border-zenith-light'}`}>
-      
-      {/* Toast Notification (Scoped to this component) */}
-      {conversionStatus && (
-          <div className="absolute -top-10 right-0 z-50 animate-in slide-in-from-bottom-2 duration-300">
-              <div className="bg-zenith-surface border border-zenith-orange px-3 py-1.5 shadow-lg flex items-center gap-2">
-                  <div className="bg-zenith-orange text-black p-0.5">
-                      <Icons.Zap size={10} />
-                  </div>
-                  <span className="font-mono text-white font-bold text-[10px] tracking-widest uppercase">
-                      {conversionStatus}
-                  </span>
-              </div>
-          </div>
-      )}
-
-      {/* Collapsed View (Input Trigger) */}
-      {!isExpanded && (
-        <div 
-            onClick={() => setIsExpanded(true)}
-            className="p-4 flex items-center gap-4 cursor-text"
-        >
-            <div className="text-zenith-orange animate-pulse">
-                <Icons.Edit size={18} />
+    <div className="fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center z-[150] p-0 sm:p-4">
+      <div 
+        ref={modalRef}
+        className="bg-zenith-bg border-0 sm:border border-zenith-orange w-full h-full sm:h-auto sm:max-w-2xl shadow-[0_0_50px_rgba(255,77,0,0.2)] animate-in zoom-in-95 fade-in duration-200 overflow-y-auto"
+      >
+        {/* Toast Notification */}
+        {conversionStatus && (
+            <div className="absolute top-4 right-4 z-[160] animate-in slide-in-from-top-2 duration-300">
+                <div className="bg-zenith-surface border border-zenith-orange px-3 py-1.5 shadow-lg flex items-center gap-2">
+                    <div className="bg-zenith-orange text-black p-0.5">
+                        <Icons.Zap size={10} />
+                    </div>
+                    <span className="font-mono text-white font-bold text-[10px] tracking-widest uppercase">
+                        {conversionStatus}
+                    </span>
+                </div>
             </div>
-            <span className="font-mono text-zenith-muted text-sm tracking-wide">
-                INITIATE QUICK CAPTURE PROTOCOL...
-            </span>
-        </div>
-      )}
+        )}
 
-      {/* Expanded View */}
-      {isExpanded && (
-        <div className="p-6">
-            <div className="flex items-center justify-between mb-4 border-b border-zenith-border pb-2">
-                <span className="font-mono text-xs text-zenith-orange tracking-widest uppercase flex items-center gap-2">
-                    <Icons.Zap size={12} /> Live Uplink
-                </span>
-                <button onClick={() => setIsExpanded(false)} className="text-zenith-muted hover:text-white">
-                    <Icons.Close size={16} />
+        <div className="p-5 sm:p-8">
+            <div className="flex items-center justify-between mb-6 border-b border-zenith-border pb-4">
+                <div className="flex flex-col">
+                    <span className="font-mono text-xs text-zenith-orange tracking-widest uppercase flex items-center gap-2">
+                        <Icons.Zap size={12} className="animate-pulse" /> Mobile Inject
+                    </span>
+                    <span className="font-mono text-[9px] text-zenith-muted mt-1 uppercase">Fragment Uplink Protocol</span>
+                </div>
+                <button onClick={onClose} className="text-zenith-muted hover:text-white p-2 transition-colors">
+                    <Icons.Close size={24} />
                 </button>
             </div>
 
-            <div className="space-y-4">
-                <textarea 
-                    ref={textAreaRef}
-                    autoFocus
-                    value={content}
-                    onChange={e => setContent(e.target.value)}
-                    onPaste={handlePaste}
-                    placeholder="Enter raw data stream... (Auto-converts to clean Markdown, images removed)"
-                    className="w-full bg-black border border-zenith-border p-4 text-white font-mono text-sm focus:border-zenith-orange focus:outline-none min-h-[120px] max-h-[60vh] overflow-y-auto resize-none"
-                    style={{ height: 'auto' }}
-                />
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input 
-                        type="text"
-                        value={title}
-                        onChange={e => setTitle(e.target.value)}
-                        placeholder="Filename (Optional)"
-                        className="bg-black border border-zenith-border p-2 text-white font-mono text-xs focus:border-zenith-orange focus:outline-none"
+            <div className="space-y-6">
+                <div className="relative">
+                    <textarea 
+                        ref={textAreaRef}
+                        autoFocus
+                        value={content}
+                        onChange={e => setContent(e.target.value)}
+                        onPaste={handlePaste}
+                        placeholder="INPUT RAW DATA..."
+                        className="w-full bg-black border border-zenith-border p-4 text-white font-mono text-base focus:border-zenith-orange focus:outline-none min-h-[40vh] sm:min-h-[200px] max-h-[60vh] overflow-y-auto resize-none leading-relaxed transition-colors"
+                        style={{ height: 'auto' }}
                     />
+                </div>
 
-                    <div className="relative">
-                        {!isCreatingRepo ? (
-                            <div className="flex gap-2">
-                                <select 
-                                    value={selectedRepoId}
-                                    onChange={e => {
-                                        if(e.target.value === 'NEW') {
-                                            setIsCreatingRepo(true);
-                                        } else {
-                                            setSelectedRepoId(e.target.value);
-                                        }
-                                    }}
-                                    className="flex-1 bg-black border border-zenith-border p-2 text-white font-mono text-xs focus:border-zenith-orange focus:outline-none appearance-none"
-                                >
-                                    <option value="" disabled>Select Target Module</option>
-                                    {repos.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                                    <option value="NEW" className="text-zenith-orange">[+ CREATE NEW MODULE]</option>
-                                </select>
-                                <div className="absolute right-2 top-2.5 pointer-events-none text-zenith-muted">
-                                    <Icons.ChevronRight size={12} className="rotate-90" />
+                <div className="grid grid-cols-1 gap-6">
+                    <div className="space-y-1">
+                        <label className="font-mono text-[9px] text-zenith-muted uppercase ml-1">Sector Destination</label>
+                        <div className="relative">
+                            {!isCreatingRepo ? (
+                                <div className="flex gap-2">
+                                    <select 
+                                        value={selectedRepoId}
+                                        onChange={e => {
+                                            if(e.target.value === 'NEW') {
+                                                setIsCreatingRepo(true);
+                                            } else {
+                                                setSelectedRepoId(e.target.value);
+                                            }
+                                        }}
+                                        className="flex-1 bg-black border border-zenith-border p-3.5 text-white font-mono text-sm focus:border-zenith-orange focus:outline-none appearance-none cursor-pointer"
+                                    >
+                                        <option value="" disabled>SELECT SECTOR</option>
+                                        {repos.map(r => <option key={r.id} value={r.id}>{r.name.toUpperCase()}</option>)}
+                                        <option value="NEW" className="text-zenith-orange font-bold font-mono">[+] INITIALIZE NEW</option>
+                                    </select>
+                                    <div className="absolute right-3 top-4 pointer-events-none text-zenith-muted">
+                                        <Icons.ChevronDown size={14} />
+                                    </div>
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="flex gap-2">
-                                <input 
-                                    type="text"
-                                    value={newRepoName}
-                                    onChange={e => setNewRepoName(e.target.value)}
-                                    placeholder="New Module Name"
-                                    className="flex-1 bg-black border border-zenith-orange p-2 text-zenith-orange font-mono text-xs focus:outline-none placeholder:text-zenith-orange/50"
-                                />
-                                <button 
-                                    onClick={() => setIsCreatingRepo(false)}
-                                    className="p-2 border border-zenith-border text-zenith-muted hover:text-white"
-                                >
-                                    <Icons.Close size={14} />
-                                </button>
-                            </div>
-                        )}
+                            ) : (
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text"
+                                        value={newRepoName}
+                                        onChange={e => setNewRepoName(e.target.value)}
+                                        placeholder="NEW-SECTOR-ID"
+                                        className="flex-1 bg-black border border-zenith-orange p-3.5 text-zenith-orange font-mono text-sm focus:outline-none placeholder:text-zenith-orange/30"
+                                    />
+                                    <button 
+                                        onClick={() => setIsCreatingRepo(false)}
+                                        className="px-4 border border-zenith-border text-zenith-muted hover:text-white transition-colors"
+                                    >
+                                        <Icons.Close size={16} />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex justify-end pt-2">
-                    <button 
-                        onClick={handleSave}
-                        disabled={isSaving || !content.trim()}
-                        className={`bg-zenith-orange text-black px-6 py-2 text-xs font-bold font-mono tracking-widest uppercase hover:bg-white transition-colors flex items-center gap-2 ${isSaving ? 'opacity-50 cursor-wait' : ''}`}
-                    >
-                        {isSaving ? 'Transmitting...' : (
-                            <>
-                                <Icons.Upload size={14} /> Commit Data
-                            </>
-                        )}
-                    </button>
+                <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-6 pt-6 border-t border-zenith-border">
+                    <div className="font-mono text-[9px] text-zenith-muted text-center sm:text-left opacity-60">
+                        ZENITH CLOUD SYNC ACTIVE
+                    </div>
+                    <div className="flex w-full sm:w-auto gap-4">
+                        <button 
+                            onClick={onClose}
+                            className="flex-1 sm:flex-none px-6 py-3.5 border border-zenith-border text-zenith-muted font-mono text-xs uppercase tracking-widest hover:text-white transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={handleSave}
+                            disabled={isSaving || !content.trim()}
+                            className={`flex-1 sm:flex-none bg-zenith-orange text-black px-10 py-3.5 text-xs font-bold font-mono tracking-widest uppercase hover:bg-white transition-colors flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(255,77,0,0.3)] ${isSaving ? 'opacity-50 cursor-wait' : ''}`}
+                        >
+                            {isSaving ? 'UPLOADING...' : (
+                                <>
+                                    <Icons.Upload size={14} /> TRANSMIT
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

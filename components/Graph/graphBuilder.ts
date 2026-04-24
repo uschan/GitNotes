@@ -11,8 +11,8 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
     dagreGraph.setGraph({ 
         rankdir: 'LR', 
         align: 'DL',
-        nodesep: 60,
-        ranksep: 100 
+        nodesep: 80, // Increased nodesep for more space
+        ranksep: 140  // Increased ranksep for more space
     });
 
     nodes.forEach((node) => {
@@ -266,21 +266,22 @@ export const buildGraphData = (
         const isBiDirectional = connectionRegistry.has(`${conn.target}|${conn.source}`);
         const targetData = globalNodeDataMap.get(conn.target);
         const sourceData = globalNodeDataMap.get(conn.source);
+        const sourceColor = nodeColorMap.get(conn.source) || NEUTRAL_COLOR;
         
         return {
             id: `${conn.source}-${conn.target}`,
             source: conn.source,
             target: conn.target,
             type: 'custom-delete', 
-            animated: false,
+            animated: isBiDirectional, // Animate bi-directional flow
             style: { 
-                strokeWidth: 1,
-                strokeDasharray: isBiDirectional ? 'none' : '4 4',
-                stroke: isBiDirectional ? '#52525B' : '#27272A', 
+                strokeWidth: isBiDirectional ? 1.5 : 1,
+                stroke: isBiDirectional ? sourceColor : '#27272A', 
+                opacity: 0.4,
             }, 
             markerEnd: { 
                 type: MarkerType.ArrowClosed,
-                color: isBiDirectional ? '#52525B' : '#27272A',
+                color: isBiDirectional ? sourceColor : '#27272A',
             },
             data: {
                 sourceName: sourceData?.name,
