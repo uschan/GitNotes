@@ -69,7 +69,11 @@ import {
   Upload,
   LayoutTemplate,
   Heading1,
-  Book
+  Book,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ExternalLink,
+  Shield
 } from 'lucide-react';
 
 /**
@@ -152,7 +156,11 @@ export const Icons = {
   Heading1,
   Heading: Heading1,
   Book,
-  BookOpen: Book
+  BookOpen: Book,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ExternalLink,
+  Shield
 };
 
 // Also export individually for convenience
@@ -227,7 +235,11 @@ export {
   Upload,
   LayoutTemplate,
   Heading1,
-  Book
+  Book,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ExternalLink,
+  Shield
 };
 
 export type IconName = keyof typeof Icons;

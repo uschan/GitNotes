@@ -139,6 +139,55 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
     return items;
   }, [content]);
 
+  // --- Outgoing Links Logic ---
+  const outgoingLinks = useMemo(() => {
+    if (!content) return [];
+    const links: any[] = [];
+    const wikiLinkRegex = /\[\[(.*?)\]\]/g;
+    const markdownLinkRegex = /\[(.*?)\]\(\/(.*?)\/(.*?)\)/g;
+
+    let match;
+    // Wikilinks
+    while ((match = wikiLinkRegex.exec(content)) !== null) {
+        const targetName = match[1];
+        // Find file with this name (approximate)
+        repos.forEach(r => {
+            r.files.forEach(f => {
+                if (f.name.replace('.md', '').toLowerCase() === targetName.toLowerCase()) {
+                    links.push({
+                        fileId: f.id,
+                        fileName: f.name,
+                        repoId: r.id,
+                        repoName: r.name,
+                        type: 'internal'
+                    });
+                }
+            });
+        });
+    }
+    // Markdown links to internal files
+    while ((match = markdownLinkRegex.exec(content)) !== null) {
+        const repoId = match[2];
+        const fileId = match[3];
+        const r = repos.find(rp => rp.id === repoId);
+        const f = r?.files.find(fl => fl.id === fileId);
+        if (f) {
+            links.push({
+                fileId: f.id,
+                fileName: f.name,
+                repoId: r!.id,
+                repoName: r!.name,
+                type: 'direct'
+            });
+        }
+    }
+
+    // Deduplicate
+    return links.filter((link, index, self) =>
+        index === self.findIndex((t) => t.fileId === link.fileId)
+    );
+  }, [content, repos]);
+
   if (!repo || !file) {
     return <div className="h-screen flex items-center justify-center font-mono text-zenith-orange uppercase tracking-widest">Error: Access Denied or Missing Record</div>;
   }
@@ -428,6 +477,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
                     file={file}
                     repoName={repo.name}
                     backlinks={backlinks}
+                    outgoingLinks={outgoingLinks}
                     onClose={() => setIsMetaOpen(false)}
                 />
              </>

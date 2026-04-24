@@ -46,6 +46,37 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
   }), []);
 
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // --- FILTERED NODES ---
+  const filteredNodes = useMemo(() => {
+    if (!searchTerm.trim()) return nodes;
+    const lowerSearch = searchTerm.toLowerCase();
+    return nodes.map(node => {
+        const matches = node.data.label.toLowerCase().includes(lowerSearch);
+        return {
+            ...node,
+            hidden: !matches && !highlightedNeighbors.has(node.id)
+        }
+    });
+  }, [nodes, searchTerm]);
+
+  // To properly filter we need to know who the neighbors are even if hidden
+  const highlightedNeighbors = useMemo(() => {
+      const neighbors = new Set<string>();
+      if (!searchTerm.trim()) return neighbors;
+      const lowerSearch = searchTerm.toLowerCase();
+      
+      const matchingNodeIds = nodes
+        .filter(n => n.data.label.toLowerCase().includes(lowerSearch))
+        .map(n => n.id);
+
+      edges.forEach(edge => {
+          if (matchingNodeIds.includes(edge.source)) neighbors.add(edge.target);
+          if (matchingNodeIds.includes(edge.target)) neighbors.add(edge.source);
+      });
+      return neighbors;
+  }, [nodes, edges, searchTerm]);
 
   // --- HIGHLIGHT LOGIC ---
   const highlightedEdges = useMemo(() => {
@@ -72,7 +103,7 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
         if (edge.target === hoveredNodeId) neighbors.add(edge.source);
     });
 
-    return nodes.map(node => {
+    return filteredNodes.map(node => {
         const isHovered = node.id === hoveredNodeId;
         const isNeighbor = neighbors.has(node.id);
         
@@ -80,15 +111,15 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
             ...node,
             style: {
                 ...node.style,
-                opacity: (isHovered || isNeighbor) ? 1 : 0.2,
+                opacity: node.hidden ? 0 : ((isHovered || isNeighbor) ? 1 : (hoveredNodeId ? 0.2 : 1)),
                 scale: isHovered ? 1.05 : 1,
                 boxShadow: isHovered ? `0 0 30px #ff4d0040` : node.style?.boxShadow,
-                filter: (isHovered || isNeighbor) ? 'none' : 'grayscale(0.8) blur(2px)',
+                filter: (isHovered || isNeighbor || !hoveredNodeId) ? 'none' : 'grayscale(0.8) blur(2px)',
                 zIndex: isHovered ? 100 : (isNeighbor ? 50 : 1),
             }
         };
     });
-  }, [nodes, edges, hoveredNodeId]);
+  }, [filteredNodes, edges, hoveredNodeId]);
 
   const onNodeMouseEnter = (_: any, node: Node) => {
     setHoveredNodeId(node.id);
@@ -144,6 +175,25 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
   return (
     <div className="w-full h-[60vh] sm:h-[calc(100vh-180px)] border border-zenith-border bg-zenith-bg relative group overflow-hidden">
         
+        {/* Graph Search (Top Left) */}
+        <div className="absolute top-4 left-4 z-10 flex gap-2 w-full max-w-xs pointer-events-none sm:pointer-events-auto">
+             <div className="relative group/search flex-1 hidden sm:block">
+                 <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zenith-muted group-focus-within/search:text-zenith-orange transition-colors" size={14} />
+                 <input 
+                    type="text"
+                    placeholder="Search graph..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full bg-black/60 backdrop-blur-md border border-zenith-border focus:border-zenith-orange px-10 py-2 font-mono text-[10px] text-white outline-none transition-all"
+                 />
+                 {searchTerm && (
+                     <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-zenith-muted hover:text-white">
+                         <Icons.Close size={12} />
+                     </button>
+                 )}
+             </div>
+        </div>
+
         {/* Graph Toolbar */}
         <div className="absolute top-4 right-4 z-10 flex gap-2">
             <button 

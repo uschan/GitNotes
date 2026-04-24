@@ -13,6 +13,7 @@ import SocialBar from './components/SocialBar';
 import GlobalSearch from './components/GlobalSearch';
 import QuickCapture from './components/QuickCapture';
 import SystemSettingsModal from './components/SystemSettingsModal';
+import CommandPalette from './components/CommandPalette';
 import { api } from './services/dataService';
 import { Repository } from './types';
 import { Icons } from './components/Icon';
@@ -78,8 +79,23 @@ function App() {
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
-  // Load Data function
+  // Listen for Cmd+K and Alt+N
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(true);
+      }
+      if (e.altKey && e.key === 'n') {
+        e.preventDefault();
+        setIsQuickCaptureOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
   const loadData = useCallback(async (key: string) => {
       setLoading(true);
       try {
@@ -455,6 +471,12 @@ function App() {
           onClose={() => setIsSettingsOpen(false)}
           repos={repos}
           onImport={handleImport}
+      />
+
+      <CommandPalette 
+          isOpen={isCommandPaletteOpen}
+          onClose={() => setIsCommandPaletteOpen(false)}
+          repos={repos}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Repository } from '../types';
 import { Icons } from '../components/Icon';
 import { Link } from 'react-router-dom';
@@ -24,6 +24,22 @@ const Dashboard: React.FC<DashboardProps> = ({ repos, onCreateRepo, onQuickSave,
   const [showNewRepoModal, setShowNewRepoModal] = useState(false);
   const [newRepoName, setNewRepoName] = useState('');
   const [newRepoDesc, setNewRepoDesc] = useState('');
+
+  const recentFiles = useMemo(() => {
+    const allFiles: any[] = [];
+    repos.forEach(repo => {
+        repo.files.forEach(file => {
+            allFiles.push({
+                ...file,
+                repoId: repo.id,
+                repoName: repo.name
+            });
+        });
+    });
+    return allFiles
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .slice(0, 4);
+  }, [repos]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,6 +93,30 @@ const Dashboard: React.FC<DashboardProps> = ({ repos, onCreateRepo, onQuickSave,
                 <div className="font-mono text-[10px] tracking-widest text-zenith-muted mb-4 uppercase">Neural Activity Graph</div>
                 <ContributionGraph repos={repos} onDrawPixel={onPixelArt} />
             </section>
+
+            {/* Recent Files Section */}
+            {recentFiles.length > 0 && (
+                <section>
+                    <div className="font-mono text-[10px] tracking-widest text-zenith-muted mb-4 uppercase">Recent Telemetry</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {recentFiles.map(file => (
+                            <Link 
+                                key={`${file.repoId}-${file.id}`}
+                                to={`/${file.repoId}/${file.id}`}
+                                className="group bg-zenith-surface/30 border border-zenith-border p-4 hover:border-zenith-orange transition-all flex items-center gap-4"
+                            >
+                                <div className="p-2 bg-zenith-bg border border-zenith-border group-hover:border-zenith-orange/30 transition-colors">
+                                    <Icons.FileText size={18} className="text-zenith-muted group-hover:text-zenith-orange transition-colors" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="font-mono text-sm font-bold text-white truncate group-hover:text-zenith-orange transition-colors">{file.name}</div>
+                                    <div className="font-mono text-[9px] text-zenith-muted uppercase tracking-tighter truncate opacity-60">Sector: {file.repoName}</div>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                </section>
+            )}
 
             {/* Modules Overview */}
             <section>
