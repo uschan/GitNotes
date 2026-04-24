@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Repository } from '../types';
 import { Icons } from './Icon';
-import { clsx } from 'clsx';
+import clsx from 'clsx';
 
 interface CommandPaletteProps {
   isOpen: boolean;

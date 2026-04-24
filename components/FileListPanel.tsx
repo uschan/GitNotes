@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, useParams } from 'react-router-dom';
 import { Repository } from '../types';
 import { Icons } from './Icon';
-import { clsx } from 'clsx';
+import clsx from 'clsx';
 
 interface FileListPanelProps {
   repos: Repository[];
@@ -33,79 +33,89 @@ const FileListPanel: React.FC<FileListPanelProps> = ({ repos, onAddFile }) => {
   };
 
   return (
-    <div className="hidden lg:flex w-80 bg-zenith-bg border-r border-zenith-border flex-col shrink-0">
+    <div className="flex w-72 bg-[#080808] border-r border-zenith-border flex-col shrink-0 overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-zenith-border">
+      <div className="px-5 py-4 border-b border-zenith-border bg-[#0d0d0d]">
         <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-sm tracking-tight text-white uppercase truncate">{repo.name}</h2>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2 min-w-0">
+                <h2 className="font-bold text-[13px] uppercase tracking-[0.1em] text-zenith-muted truncate">{repo.name}</h2>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
                 <button 
                   onClick={() => setShowAdd(!showAdd)}
-                  className="p-1.5 text-zenith-muted hover:text-white transition-colors"
+                  className="w-5 h-5 flex items-center justify-center rounded bg-zenith-surface border border-zenith-border text-zenith-muted hover:text-white transition-colors"
                 >
-                    <Icons.Plus size={16} />
+                    <Icons.Plus size={12} />
                 </button>
             </div>
         </div>
         
         <div className="relative group">
-            <Icons.Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zenith-muted group-focus-within:text-zenith-orange" />
+            <Icons.Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zenith-border group-focus-within:text-zenith-orange transition-colors" />
             <input 
                 type="text"
-                placeholder="Search notes..."
+                placeholder="Search module..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full bg-zenith-surface border border-zenith-border rounded px-8 py-1.5 text-[11px] font-mono focus:border-zenith-orange outline-none transition-colors"
+                className="w-full bg-black/40 border border-zenith-border rounded pl-8 pr-3 py-1.5 text-[11px] font-sans text-white outline-none focus:border-white/20 transition-all placeholder:text-zenith-border"
             />
         </div>
-      </div>
 
-      {/* File List */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pt-2">
         {showAdd && (
-            <div className="px-3 mb-2 animate-in slide-in-from-top-2">
-                <form onSubmit={handleAdd} className="flex gap-2">
+            <div className="mt-3 animate-in slide-in-from-top-2 duration-200">
+                <form onSubmit={handleAdd}>
                     <input 
                         autoFocus
                         value={newName}
                         onChange={e => setNewName(e.target.value)}
-                        placeholder="filename.md"
-                        className="flex-1 bg-black border border-zenith-orange px-2 py-1 text-[11px] font-mono text-white outline-none"
+                        placeholder="New entry name..."
+                        className="w-full bg-zenith-surface border border-zenith-orange px-3 py-1.5 text-[11px] font-mono text-white outline-none rounded"
                     />
                 </form>
             </div>
         )}
+      </div>
 
+      {/* File List */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         {filteredFiles.length === 0 ? (
-            <div className="p-8 text-center text-[10px] text-zenith-muted font-mono uppercase">
-                No entries found
+            <div className="p-12 text-center text-[10px] text-zenith-muted font-mono uppercase tracking-[0.2em] opacity-40">
+                No Entries
             </div>
         ) : (
-            filteredFiles.map(file => (
-                <NavLink
-                    key={file.id}
-                    to={`/${repo.id}/${file.id}`}
-                    className={({ isActive }) => clsx(
-                        "block px-4 py-3 border-b border-zenith-border/50 hover:bg-zenith-surface transition-colors",
-                        isActive ? "bg-zenith-surface border-l-2 border-l-zenith-orange" : ""
-                    )}
-                >
-                    <div className="flex items-center justify-between mb-1">
-                        <span className={clsx(
-                            "font-bold text-[13px] tracking-tight truncate flex-1",
-                            activeFileId === file.id ? "text-zenith-orange" : "text-white"
-                        )}>
-                            {file.name.replace('.md', '')}
-                        </span>
-                        <span className="text-[9px] text-zenith-muted font-mono shrink-0 ml-2">
-                            {new Date(file.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        </span>
-                    </div>
-                    <p className="text-[11px] text-zenith-muted line-clamp-1 font-mono opacity-60">
-                        {file.content.substring(0, 100).replace(/[#*`[\]]/g, '') || "No content data available."}
-                    </p>
-                </NavLink>
-            ))
+            filteredFiles.map(file => {
+                const isActive = activeFileId === file.id;
+                return (
+                    <NavLink
+                        key={file.id}
+                        to={`/${repo.id}/${file.id}`}
+                        className={clsx(
+                            "block px-5 py-3.5 border-b border-zenith-border/30 transition-all relative group",
+                            isActive ? "bg-white/[0.03]" : "hover:bg-white/[0.01]"
+                        )}
+                    >
+                        {isActive && (
+                            <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-zenith-orange shadow-[0_0_10px_rgba(255,77,0,0.5)]"></div>
+                        )}
+                        
+                        <div className="flex items-start justify-between gap-3 mb-1">
+                            <h3 className={clsx(
+                                "font-bold text-[13px] leading-snug truncate tracking-tight",
+                                isActive ? "text-white" : "text-white/60 group-hover:text-white transition-colors"
+                            )}>
+                                {file.name.replace('.md', '')}
+                            </h3>
+                            <span className="text-[9px] font-mono tabular-nums text-zenith-border mt-0.5 whitespace-nowrap">
+                                {new Date(file.updatedAt).toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' })}
+                            </span>
+                        </div>
+                        
+                        <p className="text-[11px] text-zenith-muted line-clamp-1 leading-relaxed opacity-50 group-hover:opacity-80 transition-opacity font-serif italic pr-4">
+                            {file.content.substring(0, 80).replace(/[#*`[\]]/g, '') || "No initial data stream recorded."}
+                        </p>
+                    </NavLink>
+                );
+            })
         )}
       </div>
     </div>

@@ -9,7 +9,7 @@ import LinkSelectorModal from '../components/LinkSelectorModal';
 import { convertHtmlToMarkdown } from '../utils/markdownPaste';
 import PropertiesPanel from '../components/Editor/PropertiesPanel';
 import TableOfContents, { TocItem } from '../components/Editor/TableOfContents';
-import { clsx } from 'clsx';
+import clsx from 'clsx';
 
 interface FileEditorProps {
   repos: Repository[];
@@ -323,11 +323,17 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
           </div>
       )}
 
-      {/* File Toolbar */}
-      <div className="min-h-[3.5rem] border-b border-zenith-border bg-zenith-bg flex flex-col md:flex-row md:items-center justify-between px-4 sm:px-6 shrink-0 relative z-10 gap-4 py-3 md:py-0">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1 w-full md:w-auto">
-              {isRenaming && isAuthenticated ? (
-                  <div className="flex items-center gap-2 w-full max-w-sm">
+      {/* File Toolbar / Breadcrumb Header */}
+      <div className="h-14 border-b border-zenith-border bg-zenith-bg/80 backdrop-blur-md flex items-center justify-between px-6 shrink-0 z-20">
+          {/* Left: Breadcrumbs & Stats */}
+          <div className="flex items-center gap-3 min-w-0">
+              <div className="flex items-center gap-2 text-zenith-muted text-[13px] font-medium shrink-0">
+                  <span className="hover:text-white cursor-pointer transition-colors" onClick={() => navigate(`/${repoId}`)}>{repo.name}</span>
+                  <Icons.ChevronRight size={14} className="opacity-40" />
+              </div>
+              
+              <div className="flex items-center gap-2 min-w-0">
+                  {isRenaming && isAuthenticated ? (
                       <input 
                         autoFocus
                         type="text"
@@ -335,91 +341,71 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
                         onChange={(e) => setRenameValue(e.target.value)}
                         onBlur={handleRenameSubmit}
                         onKeyDown={(e) => e.key === 'Enter' && handleRenameSubmit()}
-                        className="bg-black border border-zenith-orange text-white font-mono text-sm font-bold tracking-wide px-2 py-1 outline-none w-full"
+                        className="bg-black border border-zenith-orange text-white font-bold text-base px-2 py-0.5 outline-none w-48"
                       />
-                  </div>
-              ) : (
-                  <div className="flex items-center gap-2 group cursor-pointer min-w-0" onClick={() => isAuthenticated && setIsRenaming(true)}>
-                    <span className="font-mono text-sm text-white font-bold tracking-wide truncate group-hover:text-zenith-orange transition-colors" title={file.name}>
-                        {file.name}
-                    </span>
-                    {isAuthenticated && <Icons.Edit size={12} className="text-zenith-border group-hover:text-zenith-orange opacity-0 group-hover:opacity-100 transition-all shrink-0"/>}
-                  </div>
-              )}
-
-              {hasChanges && <span className="text-[9px] bg-zenith-orange text-black px-1.5 py-0.5 font-bold font-mono shrink-0">UNSAVED</span>}
-              {!isAuthenticated && <span className="text-[10px] border border-zenith-border text-zenith-muted px-2 py-0.5 font-mono uppercase shrink-0 hidden sm:block">Read Only</span>}
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0 w-full md:w-auto justify-between md:justify-end">
-             <div className="flex border border-zenith-border p-0.5 bg-zenith-surface rounded overflow-hidden">
-                  <button 
-                     onClick={() => setViewMode('write')}
-                     className={clsx(
-                         "px-3 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all flex items-center gap-2",
-                         viewMode === 'write' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'
-                     )}
-                     title="Write Mode"
-                  >
-                     <Icons.Edit size={12} /> <span className="hidden sm:inline">Write</span>
-                  </button>
-                  <button 
-                     onClick={() => setViewMode('split')}
-                     className={clsx(
-                         "hidden lg:flex px-3 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all flex items-center gap-2 border-l border-r border-zenith-border",
-                         viewMode === 'split' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'
-                     )}
-                     title="Split View"
-                  >
-                     <Icons.Layout size={12} /> <span className="hidden sm:inline">Split</span>
-                  </button>
-                  <button 
-                     onClick={() => setViewMode('preview')}
-                     className={clsx(
-                         "px-3 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all flex items-center gap-2",
-                         viewMode === 'preview' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white',
-                         (viewMode === 'split') && "lg:border-l-0 border-l border-zenith-border"
-                     )}
-                     title="Preview Mode"
-                  >
-                     <Icons.File size={12} /> <span className="hidden sm:inline">Render</span>
-                  </button>
+                  ) : (
+                      <div className="flex items-center gap-2 group cursor-pointer min-w-0" onClick={() => isAuthenticated && setIsRenaming(true)}>
+                        <h1 className="text-white font-bold text-base truncate group-hover:text-zenith-orange transition-colors">
+                            {file.name.replace('.md', '')}
+                        </h1>
+                      </div>
+                  )}
               </div>
 
-              {isAuthenticated && (
-                 <div className="flex items-center gap-2">
+              <div className="h-4 w-px bg-zenith-border mx-1 hidden sm:block"></div>
+              
+              <div className="hidden md:flex items-center gap-3 text-[11px] text-zenith-muted font-mono opacity-60 italic shrink-0">
+                  <span>{content.trim() ? content.trim().split(/\s+/).length : 0} words</span>
+              </div>
+          </div>
+
+          {/* Right: Actions Cluster */}
+          <div className="flex items-center gap-1 sm:gap-2">
+              {/* Sync Status */}
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 border border-zenith-border rounded-md mr-2">
+                  {isAutoSaving ? (
+                      <Icons.RefreshCw size={14} className="text-zenith-orange animate-spin" />
+                  ) : (
+                      <Icons.Check size={14} className="text-zenith-green" />
+                  )}
+                  <span className="text-[10px] font-bold font-mono text-zenith-muted uppercase tracking-widest leading-none">
+                      {isAutoSaving ? 'Saving' : 'Synced'}
+                  </span>
+              </div>
+
+          {/* Action Icons */}
+              <div className="flex items-center gap-0.5 sm:gap-1">
                   <button 
-                     onClick={() => setIsMetaOpen(!isMetaOpen)}
-                     className={clsx(
-                         "p-2 transition-colors",
-                         isMetaOpen ? 'text-zenith-orange' : 'text-zenith-muted hover:text-white'
-                     )}
-                     title="Toggle Information Panel"
+                    onClick={() => {
+                        if (viewMode === 'split') setViewMode('write');
+                        else if (viewMode === 'write') setViewMode('preview');
+                        else setViewMode('split');
+                    }} 
+                    className={clsx(
+                        "p-2 transition-all rounded-md flex items-center gap-2",
+                        "text-zenith-muted hover:text-white hover:bg-white/5"
+                    )}
+                    title={`View Mode: ${viewMode.toUpperCase()} (Click to cycle)`}
                   >
-                     <Icons.Info size={16} />
+                      {viewMode === 'split' && <Icons.Columns size={18} className="text-zenith-orange" />}
+                      {viewMode === 'write' && <Icons.Edit size={18} className="text-zenith-orange" />}
+                      {viewMode === 'preview' && <Icons.Eye size={18} className="text-zenith-orange" />}
+                      <span className="text-[10px] font-bold font-mono uppercase tracking-widest hidden lg:inline opacity-60">
+                        {viewMode === 'split' ? 'Split' : viewMode === 'write' ? 'Write' : 'View'}
+                      </span>
                   </button>
-                  <div className="h-4 w-px bg-zenith-border mx-1 hidden sm:block"></div>
                   <button 
-                     onClick={handleSave}
-                     disabled={!hasChanges || isAutoSaving}
-                     className={clsx(
-                         "flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 border text-[9px] sm:text-[10px] font-mono tracking-widest uppercase transition-colors shrink-0",
-                         hasChanges ? 'border-zenith-orange text-zenith-orange hover:bg-zenith-orange hover:text-black shadow-[0_0_10px_rgba(255,77,0,0.2)]' : 'border-zenith-border text-zenith-muted cursor-not-allowed'
-                     )}
+                    onClick={() => setIsMetaOpen(!isMetaOpen)} 
+                    className={clsx("p-2 transition-colors rounded-md", isMetaOpen ? 'text-zenith-orange bg-zenith-orange/10' : 'text-zenith-muted hover:text-white hover:bg-white/5')}
+                    title="Properties Panel"
                   >
-                     {isAutoSaving ? (
-                        <>
-                            <Icons.RefreshCw size={12} className="animate-spin" /> <span className="hidden xs:inline">Syncing</span>
-                        </>
-                     ) : (
-                        <>
-                            <Icons.Save size={14} /> <span>{hasChanges ? 'Commit' : 'Synced'}</span>
-                        </>
-                     )}
+                      <Icons.MoreVertical size={18} />
                   </button>
-                  <button onClick={() => setIsDeleteModalOpen(true)} className="p-2 text-zenith-muted hover:text-red-600 transition-colors hidden sm:block"><Icons.Trash size={16} /></button>
-                 </div>
-              )}
+                  <div className="w-px h-6 bg-zenith-border mx-1"></div>
+                  <button onClick={() => setIsDeleteModalOpen(true)} className="p-2 text-zenith-muted hover:text-red-500 hover:bg-red-500/10 rounded-md transition-all" title="Delete File">
+                      <Icons.Trash size={18} />
+                  </button>
+              </div>
           </div>
       </div>
 
@@ -427,8 +413,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
       <div className="flex-1 overflow-hidden relative flex flex-col lg:flex-row z-0">
          {(viewMode === 'write' || viewMode === 'split') && (
            <div className={clsx(
-               "flex flex-col border-r border-zenith-border",
-               viewMode === 'split' ? 'lg:w-1/2 w-full' : 'w-full',
+               "flex flex-col border-r border-zenith-border h-full min-w-0 flex-1",
                viewMode === 'split' && 'max-lg:hidden'
            )}>
              {isAuthenticated && <EditorToolbar onInsert={handleInsert} onLinkNote={() => setIsLinkSelectorOpen(true)} />}
@@ -475,6 +460,7 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
                 />
                 <PropertiesPanel 
                     file={file}
+                    repoId={repoId!}
                     repoName={repo.name}
                     backlinks={backlinks}
                     outgoingLinks={outgoingLinks}
@@ -484,9 +470,28 @@ const FileEditor: React.FC<FileEditorProps> = ({ repos, onUpdateFile, onRenameFi
          )}
       </div>
       
-      <div className="h-8 border-t border-zenith-border bg-zenith-surface flex items-center justify-between px-4 font-mono text-[10px] text-zenith-muted uppercase tracking-widest shrink-0">
-         <div>Ln {lineCount}, Col {content.length}</div>
-         <div>{isAuthenticated ? 'Markdown Environment' : 'Visitor View'}</div>
+      <div className="h-8 border-t border-zenith-border bg-[#0a0a0a] flex items-center justify-between px-4 font-mono text-[9px] text-zenith-muted uppercase tracking-[0.2em] shrink-0">
+         <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+                <span className="opacity-40">POS</span>
+                <span className="text-white font-bold">{lineCount} : {content.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+                <span className="opacity-40">WORD</span>
+                <span className="text-white font-bold">{content.trim() ? content.trim().split(/\s+/).length : 0}</span>
+            </div>
+            <div className="hidden sm:flex items-center gap-2">
+                <span className="opacity-40">ROOT</span>
+                <span className="text-zenith-orange font-bold uppercase tracking-widest">{repo.name}</span>
+            </div>
+         </div>
+         <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full ${isAuthenticated ? 'bg-zenith-green shadow-[0_0_5px_#4ade80]' : 'bg-zenith-muted'}`}></div>
+                <span>{isAuthenticated ? 'Live Environment' : 'Safe View'}</span>
+            </div>
+            <div className="hidden md:block opacity-30 select-none">UTF-8 / MD</div>
+         </div>
       </div>
 
       <DeleteConfirmModal 

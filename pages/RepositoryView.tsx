@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Repository } from '../types';
 import { Icons } from '../components/Icon';
+import clsx from 'clsx';
 import MarkdownPreview from '../components/MarkdownPreview';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import RepoSettingsModal from '../components/RepoSettingsModal';
@@ -157,143 +158,192 @@ const RepositoryView: React.FC<RepositoryViewProps> = ({ repos, onAddFile, onDel
   const readme = repo.files.find(f => f.name.toLowerCase() === 'readme.md');
 
   return (
-    <div className="min-h-screen bg-zenith-bg p-6 md:p-12 max-w-[1600px] mx-auto">
+    <div className="flex flex-col h-full bg-zenith-bg overflow-hidden animate-in fade-in duration-500">
       
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8 border-b border-zenith-border pb-6">
-        <div>
-            <div className="flex items-center gap-2 font-mono text-xs text-zenith-muted mb-2">
-                <Link to="/" className="hover:text-zenith-orange">ROOT</Link>
-                <span>/</span>
-                <span className="text-white">{repo.id.toUpperCase()}</span>
+      <div className="pt-8 pb-10 px-8 lg:px-12 border-b border-zenith-border/50">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.3em] text-zenith-muted uppercase opacity-60">
+                <span>ROOT</span>
+                <span className="opacity-30">/</span>
+                <span className="text-zenith-orange">{repo.id}</span>
+              </div>
+              <h1 className="text-5xl font-bold tracking-tighter text-white">{repo.name}</h1>
+              <p className="text-zenith-muted font-mono text-xs max-w-2xl opacity-70 leading-relaxed">{repo.description}</p>
             </div>
-            <h1 className="text-4xl font-bold tracking-tight text-white mb-2">{repo.name}</h1>
-            <p className="text-zenith-muted font-mono text-sm max-w-2xl">{repo.description}</p>
-        </div>
-        
-        {isAuthenticated && (
-          <div className="flex items-center gap-4">
-              {/* View Toggle (Hidden on Mobile) */}
-              <div className="hidden md:flex border border-zenith-border p-0.5 bg-zenith-surface mr-4">
-                 <button 
-                    onClick={() => setViewMode('list')}
-                    className={`px-3 py-2 text-xs font-mono uppercase transition-all flex items-center gap-2 ${viewMode === 'list' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'}`}
-                    title="List View"
-                 >
-                    <Icons.List size={14} />
-                 </button>
-                 <button 
-                    onClick={() => setViewMode('graph')}
-                    className={`px-3 py-2 text-xs font-mono uppercase transition-all flex items-center gap-2 border-l border-zenith-border ${viewMode === 'graph' ? 'bg-white text-black font-bold' : 'text-zenith-muted hover:text-white'}`}
-                    title="Constellation View"
-                 >
-                    <Icons.Network size={14} />
-                 </button>
+
+            <div className="flex items-center gap-3">
+              <div className="flex border border-zenith-border rounded-sm overflow-hidden bg-black/40">
+                <button 
+                   onClick={() => setViewMode('list')}
+                   className={clsx("p-2 transition-all group", viewMode === 'list' ? 'bg-white text-black' : 'text-zenith-muted hover:text-white')}
+                   title="Index View"
+                >
+                   <Icons.List size={16} />
+                </button>
+                <button 
+                   onClick={() => setViewMode('graph')}
+                   className={clsx("p-2 transition-all border-l border-zenith-border group", viewMode === 'graph' ? 'bg-white text-black' : 'text-zenith-muted hover:text-white')}
+                   title="Graph View"
+                >
+                   <Icons.Network size={16} />
+                </button>
               </div>
 
-              <button 
-                  onClick={() => setIsSettingsModalOpen(true)}
-                  className="bg-zenith-surface border border-zenith-border text-zenith-muted px-3 py-2 text-xs font-mono uppercase hover:text-white hover:border-white transition-colors duration-75 flex items-center gap-2"
-                  title="Configure Module"
-              >
-                  <Icons.Settings size={14} />
-              </button>
-              <div className="w-px h-6 bg-zenith-border"></div>
-              <button 
-                  onClick={() => setShowAddFile(true)}
-                  className="bg-zenith-surface border border-zenith-border text-white px-4 py-2 text-xs font-mono tracking-widest uppercase hover:bg-white hover:text-black transition-colors duration-75 flex items-center gap-2"
-              >
-                  <Icons.Plus size={14} /> Add File
-              </button>
-              <button 
-                  onClick={() => setIsDeleteModalOpen(true)}
-                  className="border border-zenith-border text-zenith-muted px-4 py-2 text-xs font-mono tracking-widest uppercase hover:border-zenith-orange hover:text-zenith-orange transition-colors duration-75"
-              >
-                  Delete
-              </button>
+              <div className="h-4 w-px bg-zenith-border mx-1"></div>
+
+              {isAuthenticated && (
+                <>
+                  <button 
+                      onClick={() => setIsSettingsModalOpen(true)}
+                      className="p-2 border border-zenith-border hover:bg-white/5 rounded-sm transition-colors text-zenith-muted hover:text-white"
+                      title="Configuration"
+                  >
+                      <Icons.Settings size={16} />
+                  </button>
+                  <button 
+                      onClick={() => onAddFile(repo.id, 'New File.md')}
+                      className="px-4 py-2 bg-white/5 border border-zenith-border hover:border-white transition-all text-[10px] font-bold uppercase tracking-widest text-white flex items-center gap-2"
+                  >
+                      <Icons.Plus size={12} /> Add File
+                  </button>
+                  <button 
+                      onClick={() => setIsDeleteModalOpen(true)}
+                      className="px-4 py-2 border border-zenith-border hover:border-red-500/50 hover:bg-red-500/5 transition-all text-[10px] font-bold uppercase tracking-widest text-zenith-muted hover:text-red-500"
+                  >
+                      Delete
+                  </button>
+                </>
+              )}
+            </div>
           </div>
+        </div>
+      </div>
+
+      {/* Main Content Pane */}
+      <div className="flex-1 overflow-hidden relative">
+        {viewMode === 'graph' ? (
+            <div className="absolute inset-0 z-0 overflow-hidden flex flex-col">
+               <div className="flex-1 relative">
+                   <GraphViewWrapper 
+                      activeRepoId={repo.id}
+                      repos={repos}
+                      scope={graphScope}
+                      onAddFile={() => setShowAddFile(true)}
+                      onLinkNodes={handleConnectNodes}
+                      onDisconnectNodes={handleDisconnectNodes}
+                   />
+
+                   {/* Scope Toggle (Floating inside Graph) */}
+                   <div className="absolute top-4 left-4 z-20 flex gap-1 bg-black/80 backdrop-blur-md p-1 border border-zenith-border rounded-lg shadow-2xl">
+                      <button 
+                         onClick={() => setGraphScope('local')}
+                         className={clsx("px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded transition-colors", graphScope === 'local' ? 'bg-zenith-orange text-black' : 'text-zenith-muted hover:text-white')}
+                      >
+                         Local
+                      </button>
+                      <button 
+                         onClick={() => setGraphScope('global')}
+                         className={clsx("px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded transition-colors", graphScope === 'global' ? 'bg-zenith-green text-black' : 'text-zenith-muted hover:text-white')}
+                      >
+                         Global
+                      </button>
+                   </div>
+               </div>
+            </div>
+        ) : (
+            <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-hidden">
+              {/* Left Column: File Index */}
+              <div className="lg:col-span-7 xl:col-span-8 flex flex-col overflow-hidden border-r border-zenith-border/50">
+                  <div className="px-8 py-4 border-b border-zenith-border/30 bg-black/20 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                          <span className="font-mono text-[10px] tracking-[0.2em] text-zenith-muted uppercase">File Index</span>
+                      </div>
+                      <span className="font-mono text-[9px] text-zenith-muted uppercase tracking-widest opacity-50">Count: {repo.files.length}</span>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto custom-scrollbar">
+                      <div className="divide-y divide-zenith-border/20">
+                          {repo.files.length > 0 ? (
+                              repo.files.map(file => (
+                                  <Link 
+                                      key={file.id} 
+                                      to={`/${repo.id}/${file.id}`}
+                                      className="flex items-center justify-between px-8 py-5 hover:bg-white/[0.02] transition-colors group"
+                                  >
+                                      <div className="flex items-center gap-4">
+                                          <Icons.FileText 
+                                              size={16} 
+                                              className={clsx(
+                                                  "transition-colors",
+                                                  file.name.toLowerCase() === 'readme.md' ? "text-zenith-orange" : "text-zenith-muted"
+                                              )} 
+                                          />
+                                          <span className={clsx(
+                                              "font-mono text-sm tracking-tight transition-colors",
+                                              file.name.toLowerCase() === 'readme.md' ? "text-white font-bold" : "text-zenith-muted group-hover:text-white"
+                                          )}>
+                                              {file.name}
+                                          </span>
+                                      </div>
+                                      <div className="flex items-center gap-8 shrink-0">
+                                          <span className="font-mono text-[10px] text-zenith-muted opacity-40">
+                                              {(file.content.length / 1024).toFixed(2)} KB
+                                          </span>
+                                          <span className="font-mono text-[10px] text-zenith-muted opacity-40 w-20 text-right">
+                                              {new Date(file.updatedAt).toLocaleDateString()}
+                                          </span>
+                                      </div>
+                                  </Link>
+                              ))
+                          ) : (
+                              <div className="py-32 text-center flex flex-col items-center justify-center">
+                                  <Icons.FolderOpen size={48} className="text-zenith-border mb-4 opacity-20" />
+                                  <div className="font-mono text-[10px] text-zenith-muted uppercase tracking-widest opacity-40">Repository is Empty</div>
+                              </div>
+                          )}
+                      </div>
+                  </div>
+              </div>
+
+              {/* Right Column: README Preview */}
+              <div className="hidden lg:flex lg:col-span-5 xl:col-span-4 flex-col overflow-hidden bg-black/20">
+                  <div className="px-8 py-4 border-b border-zenith-border/30 bg-black/20 flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 bg-zenith-green rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                      <span className="font-mono text-[10px] tracking-[0.2em] text-zenith-muted uppercase">Preview: README.md</span>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-10">
+                      {readme ? (
+                          <div className="prose prose-invert prose-zenith max-w-none">
+                              <MarkdownPreview content={readme.content} />
+                          </div>
+                      ) : (
+                          <div className="h-full flex flex-col items-center justify-center opacity-30 text-center grayscale">
+                              <Icons.FileText size={48} className="mb-4 text-zenith-border" />
+                              <p className="font-mono text-[10px] uppercase tracking-widest leading-relaxed">
+                                  No Protocol Specification (README.md) Detected in Sector
+                              </p>
+                          </div>
+                      )}
+                  </div>
+              </div>
+            </div>
         )}
       </div>
 
-      {/* Add File Input (Global for this view) */}
-      {showAddFile && isAuthenticated && (
-        <div className="mb-8 p-6 border border-zenith-orange bg-zenith-surface/50 animate-in slide-in-from-top-2">
-           <form onSubmit={handleAddFile} className="flex gap-4 items-center">
-               <span className="font-mono text-zenith-orange text-lg">/</span>
-               <input 
-                 autoFocus
-                 type="text" 
-                 placeholder="filename.md" 
-                 className="bg-transparent border-b border-zenith-border text-white p-2 font-mono text-sm flex-1 outline-none focus:border-zenith-orange"
-                 value={newFileName}
-                 onChange={e => setNewFileName(e.target.value)}
-               />
-               <button type="submit" className="text-zenith-orange font-mono text-xs uppercase hover:underline">Execute</button>
-               <button type="button" onClick={() => setShowAddFile(false)} className="text-zenith-muted font-mono text-xs uppercase hover:text-white">Cancel</button>
-           </form>
-        </div>
-      )}
-
-      {/* Main Content Switcher */}
-      {viewMode === 'graph' ? (
-          <div className="flex-1 border border-zenith-border bg-zenith-surface/20 relative hidden md:block overflow-hidden">
-             
-             {/* Scope Toggle (Floating inside Graph) */}
-             <div className="absolute top-4 left-4 z-20 flex gap-2">
-                <button 
-                   onClick={() => setGraphScope('local')}
-                   className={`px-3 py-1 text-[10px] font-mono uppercase tracking-widest border transition-colors ${graphScope === 'local' ? 'bg-zenith-orange text-black border-zenith-orange' : 'bg-black text-zenith-muted border-zenith-border hover:border-white'}`}
-                >
-                   Local Sector
-                </button>
-                <button 
-                   onClick={() => setGraphScope('global')}
-                   className={`px-3 py-1 text-[10px] font-mono uppercase tracking-widest border transition-colors ${graphScope === 'global' ? 'bg-zenith-green text-black border-zenith-green' : 'bg-black text-zenith-muted border-zenith-border hover:border-white'}`}
-                >
-                   Galaxy View
-                </button>
-             </div>
-
-             <GraphViewWrapper 
-                activeRepoId={repo.id}
-                repos={repos} // Pass ALL repos now
-                scope={graphScope}
-                onAddFile={() => setShowAddFile(true)}
-                onLinkNodes={handleConnectNodes}
-                onDisconnectNodes={handleDisconnectNodes}
-             />
+      {/* Persistence Bar */}
+      <div className="h-8 border-t border-zenith-border bg-[#0a0a0a] flex items-center justify-between px-4 font-mono text-[9px] text-zenith-muted uppercase tracking-[0.2em] shrink-0">
+          <div className="flex items-center gap-3">
+              <span className="opacity-40">PERSISTENCE</span>
+              <span className="text-zenith-green">READY</span>
           </div>
-      ) : (
-          <div className="flex-1 animate-in fade-in duration-300 overflow-hidden flex flex-col">
-              {/* README Preview Panel - Full Width in Dashboard mode */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
-                {readme ? (
-                    <div className="max-w-4xl mx-auto py-8 px-4">
-                        <div className="bg-zenith-surface border border-zenith-border mb-6 px-4 py-2 font-mono text-[10px] tracking-widest text-zenith-muted uppercase flex items-center gap-2">
-                            <div className="w-2 h-2 bg-zenith-green rounded-full"></div>
-                            <span>Project Overview: README.md</span>
-                        </div>
-                        <div className="prose prose-invert prose-zenith max-w-none">
-                            <MarkdownPreview content={readme.content} />
-                        </div>
-                    </div>
-                ) : (
-                    <div className="flex-1 flex items-center justify-center border border-zenith-border border-dashed m-12 p-12 text-center">
-                        <div className="space-y-4">
-                            <Icons.FileText size={48} className="mx-auto text-zenith-muted opacity-20" />
-                            <p className="font-mono text-xs text-zenith-muted tracking-widest">NO README DETECTED IN SECTOR</p>
-                            <button 
-                                onClick={() => onAddFile(repo.id, 'README.md')}
-                                className="text-zenith-orange hover:underline font-mono text-[10px] uppercase tracking-widest"
-                            >
-                                Initialize Documentation
-                            </button>
-                        </div>
-                    </div>
-                )}
-              </div>
+          <div className="flex items-center gap-3">
+              <span className="opacity-40">ALLOCATED</span>
+              <span className="text-white font-bold">{repo.files.length} NODES</span>
           </div>
-      )}
+      </div>
       
       {/* Mobile Fallback for Graph Mode Persistence */}
       {viewMode === 'graph' && (

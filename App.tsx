@@ -353,6 +353,7 @@ function App() {
           currentRepoId={repoIdInPath || undefined} 
           onCreateRepo={handleCreateRepo}
           onSync={handleSync}
+          onQuickCaptureOpen={() => setIsQuickCaptureOpen(true)}
           isLoading={loading}
           isSearchOpen={isSearchOpen}
           setIsSearchOpen={setIsSearchOpen}
@@ -392,6 +393,7 @@ function App() {
                         onCreateRepo={handleCreateRepo} 
                         onQuickSave={handleQuickSave}
                         onSync={handleSync}
+                        onQuickCaptureOpen={() => setIsQuickCaptureOpen(true)}
                         isLoading={loading}
                         onPixelArt={handlePixelArt}
                     />

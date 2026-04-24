@@ -64,7 +64,7 @@ const Header: React.FC<HeaderProps> = ({ onLogoutClick, secretKey, repos, toggle
         <Link to="/" className="group flex items-center gap-3 shrink-0">
           <div className={`w-3.5 h-3.5 ${isSupabaseConfigured ? 'bg-zenith-orange shadow-[0_0_8px_rgba(255,77,0,0.5)]' : 'bg-yellow-500'} group-hover:bg-white transition-colors duration-75`}></div>
           <span className="font-mono font-bold text-base tracking-tighter text-white group-hover:text-zenith-orange transition-colors duration-75 hidden sm:inline">
-            ZENITH
+            GITNOTES
           </span>
         </Link>
 

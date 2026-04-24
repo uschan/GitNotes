@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Icons } from './Icon';
+import clsx from 'clsx';
 import { Repository } from '../types';
 // @ts-ignore
 import TurndownService from 'turndown';
@@ -210,123 +211,110 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ isOpen, onClose, repos, onQ
   };
 
   return (
-    <div className="fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center z-[150] p-0 sm:p-4">
+    <div className="fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center z-[150] p-4">
       <div 
         ref={modalRef}
-        className="bg-zenith-bg border-0 sm:border border-zenith-orange w-full h-full sm:h-auto sm:max-w-2xl shadow-[0_0_50px_rgba(255,77,0,0.2)] animate-in zoom-in-95 fade-in duration-200 overflow-y-auto"
+        className="bg-black/60 backdrop-blur-xl border border-zenith-orange/40 w-full max-w-2xl shadow-[0_0_50px_rgba(255,77,0,0.15)] animate-in zoom-in-95 fade-in duration-200 relative p-8"
       >
-        {/* Toast Notification */}
-        {conversionStatus && (
-            <div className="absolute top-4 right-4 z-[160] animate-in slide-in-from-top-2 duration-300">
-                <div className="bg-zenith-surface border border-zenith-orange px-3 py-1.5 shadow-lg flex items-center gap-2">
-                    <div className="bg-zenith-orange text-black p-0.5">
-                        <Icons.Zap size={10} />
-                    </div>
-                    <span className="font-mono text-white font-bold text-[10px] tracking-widest uppercase">
-                        {conversionStatus}
-                    </span>
-                </div>
+        <button 
+          onClick={onClose}
+          className="absolute top-6 right-6 text-zenith-muted hover:text-white transition-colors"
+        >
+          <Icons.X size={20} />
+        </button>
+
+        <div className="flex items-center gap-3 mb-8 px-6 py-4 border-b border-white/5">
+          <Icons.Zap size={18} className="text-zenith-orange" />
+          <h2 className="text-[10px] font-bold tracking-[0.4em] text-zenith-orange uppercase">Live Uplink</h2>
+        </div>
+
+        <div className="space-y-6 px-6 pb-6">
+          <div className="relative">
+            <textarea
+              ref={textAreaRef}
+              autoFocus
+              className="w-full h-48 bg-[#0a0a0a] border border-white/10 focus:border-zenith-orange/50 p-6 text-sm font-mono text-white placeholder:text-zenith-muted outline-none transition-all resize-none leading-relaxed"
+              placeholder="Enter raw data stream... (Auto-converts to clean Markdown, images removed)"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              onPaste={handlePaste}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="relative">
+              <input
+                type="text"
+                className="w-full bg-[#0a0a0a] border border-white/10 focus:border-zenith-orange/50 px-5 py-3 text-xs font-mono text-white placeholder:text-zenith-muted outline-none transition-all"
+                placeholder="Filename (Optional)"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
             </div>
-        )}
 
-        <div className="p-5 sm:p-8">
-            <div className="flex items-center justify-between mb-6 border-b border-zenith-border pb-4">
-                <div className="flex flex-col">
-                    <span className="font-mono text-xs text-zenith-orange tracking-widest uppercase flex items-center gap-2">
-                        <Icons.Zap size={12} className="animate-pulse" /> Mobile Inject
-                    </span>
-                    <span className="font-mono text-[9px] text-zenith-muted mt-1 uppercase">Fragment Uplink Protocol</span>
+            <div className="relative">
+              {!isCreatingRepo ? (
+                <>
+                  <select
+                    className="w-full bg-[#0a0a0a] border border-white/10 focus:border-zenith-orange/50 px-5 py-3 text-xs font-mono text-white outline-none appearance-none cursor-pointer hover:bg-white/5 transition-colors"
+                    value={selectedRepoId}
+                    onChange={(e) => {
+                       if(e.target.value === 'NEW') {
+                           setIsCreatingRepo(true);
+                       } else {
+                           setSelectedRepoId(e.target.value);
+                       }
+                    }}
+                  >
+                    <option value="" className="bg-[#0a0a0a]">Select Target Module</option>
+                    {repos.map(repo => (
+                      <option key={repo.id} value={repo.id} className="bg-[#0a0a0a]">{repo.name.toUpperCase()}</option>
+                    ))}
+                    <option value="NEW" className="bg-[#0a0a0a] text-zenith-orange">[+] INITIALIZE NEW</option>
+                  </select>
+                  <Icons.ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-zenith-muted pointer-events-none" size={14} />
+                </>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    className="flex-1 bg-black border border-zenith-orange px-5 py-3 text-xs font-mono text-zenith-orange placeholder:text-zenith-orange/30 outline-none"
+                    placeholder="NEW-SECTOR-ID"
+                    value={newRepoName}
+                    onChange={(e) => setNewRepoName(e.target.value)}
+                  />
+                  <button 
+                    onClick={() => setIsCreatingRepo(false)}
+                    className="px-3 border border-zenith-border text-zenith-muted hover:text-white transition-colors"
+                  >
+                    <Icons.Close size={16} />
+                  </button>
                 </div>
-                <button onClick={onClose} className="text-zenith-muted hover:text-white p-2 transition-colors">
-                    <Icons.Close size={24} />
-                </button>
+              )}
             </div>
+          </div>
 
-            <div className="space-y-6">
-                <div className="relative">
-                    <textarea 
-                        ref={textAreaRef}
-                        autoFocus
-                        value={content}
-                        onChange={e => setContent(e.target.value)}
-                        onPaste={handlePaste}
-                        placeholder="INPUT RAW DATA..."
-                        className="w-full bg-black border border-zenith-border p-4 text-white font-mono text-base focus:border-zenith-orange focus:outline-none min-h-[40vh] sm:min-h-[200px] max-h-[60vh] overflow-y-auto resize-none leading-relaxed transition-colors"
-                        style={{ height: 'auto' }}
-                    />
-                </div>
-
-                <div className="grid grid-cols-1 gap-6">
-                    <div className="space-y-1">
-                        <label className="font-mono text-[9px] text-zenith-muted uppercase ml-1">Sector Destination</label>
-                        <div className="relative">
-                            {!isCreatingRepo ? (
-                                <div className="flex gap-2">
-                                    <select 
-                                        value={selectedRepoId}
-                                        onChange={e => {
-                                            if(e.target.value === 'NEW') {
-                                                setIsCreatingRepo(true);
-                                            } else {
-                                                setSelectedRepoId(e.target.value);
-                                            }
-                                        }}
-                                        className="flex-1 bg-black border border-zenith-border p-3.5 text-white font-mono text-sm focus:border-zenith-orange focus:outline-none appearance-none cursor-pointer"
-                                    >
-                                        <option value="" disabled>SELECT SECTOR</option>
-                                        {repos.map(r => <option key={r.id} value={r.id}>{r.name.toUpperCase()}</option>)}
-                                        <option value="NEW" className="text-zenith-orange font-bold font-mono">[+] INITIALIZE NEW</option>
-                                    </select>
-                                    <div className="absolute right-3 top-4 pointer-events-none text-zenith-muted">
-                                        <Icons.ChevronDown size={14} />
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="text"
-                                        value={newRepoName}
-                                        onChange={e => setNewRepoName(e.target.value)}
-                                        placeholder="NEW-SECTOR-ID"
-                                        className="flex-1 bg-black border border-zenith-orange p-3.5 text-zenith-orange font-mono text-sm focus:outline-none placeholder:text-zenith-orange/30"
-                                    />
-                                    <button 
-                                        onClick={() => setIsCreatingRepo(false)}
-                                        className="px-4 border border-zenith-border text-zenith-muted hover:text-white transition-colors"
-                                    >
-                                        <Icons.Close size={16} />
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-6 pt-6 border-t border-zenith-border">
-                    <div className="font-mono text-[9px] text-zenith-muted text-center sm:text-left opacity-60">
-                        ZENITH CLOUD SYNC ACTIVE
-                    </div>
-                    <div className="flex w-full sm:w-auto gap-4">
-                        <button 
-                            onClick={onClose}
-                            className="flex-1 sm:flex-none px-6 py-3.5 border border-zenith-border text-zenith-muted font-mono text-xs uppercase tracking-widest hover:text-white transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button 
-                            onClick={handleSave}
-                            disabled={isSaving || !content.trim()}
-                            className={`flex-1 sm:flex-none bg-zenith-orange text-black px-10 py-3.5 text-xs font-bold font-mono tracking-widest uppercase hover:bg-white transition-colors flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(255,77,0,0.3)] ${isSaving ? 'opacity-50 cursor-wait' : ''}`}
-                        >
-                            {isSaving ? 'UPLOADING...' : (
-                                <>
-                                    <Icons.Upload size={14} /> TRANSMIT
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </div>
-            </div>
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={handleSave}
+              disabled={isSaving || !content.trim() || (!selectedRepoId && !isCreatingRepo)}
+              className={clsx(
+                "px-8 py-3 font-bold text-[11px] uppercase tracking-[0.2em] transition-all flex items-center gap-3",
+                content.trim() && (selectedRepoId || (isCreatingRepo && newRepoName.trim()))
+                  ? "bg-zenith-orange text-black hover:scale-105 shadow-[0_0_20px_rgba(255,77,0,0.3)]" 
+                  : "bg-zenith-surface text-zenith-muted opacity-50 cursor-not-allowed"
+              )}
+            >
+              {isSaving ? (
+                <>UPLOADING...</>
+              ) : (
+                <>
+                  <Icons.Upload size={14} />
+                  Commit Data
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

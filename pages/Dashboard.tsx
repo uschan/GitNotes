@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Repository } from '../types';
 import { Icons } from '../components/Icon';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import QuickCapture from '../components/QuickCapture';
 import ContributionGraph from '../components/ContributionGraph';
 
@@ -10,6 +10,7 @@ interface DashboardProps {
   onCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<string | null>;
   onQuickSave: (repoId: string, title: string, content: string) => Promise<void>;
   onSync: () => void;
+  onQuickCaptureOpen: () => void;
   isLoading: boolean;
   // We need to access api to perform the specialized addFile with date, 
   // but since we are props-drilling, we'll just expose a special prop or reuse onQuickSave if we modify App.tsx. 
@@ -20,10 +21,11 @@ interface DashboardProps {
   onPixelArt?: (date: string) => Promise<void>;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ repos, onCreateRepo, onQuickSave, onSync, isLoading, onPixelArt }) => {
+const Dashboard: React.FC<DashboardProps> = ({ repos, onCreateRepo, onQuickSave, onSync, onQuickCaptureOpen, isLoading, onPixelArt }) => {
   const [showNewRepoModal, setShowNewRepoModal] = useState(false);
   const [newRepoName, setNewRepoName] = useState('');
   const [newRepoDesc, setNewRepoDesc] = useState('');
+  const navigate = useNavigate();
 
   const recentFiles = useMemo(() => {
     const allFiles: any[] = [];
@@ -65,6 +67,14 @@ const Dashboard: React.FC<DashboardProps> = ({ repos, onCreateRepo, onQuickSave,
         </div>
         
         <div className="flex items-center gap-4">
+            <button 
+                onClick={onQuickCaptureOpen} 
+                className="bg-zenith-orange/10 border border-zenith-orange/30 text-zenith-orange hover:bg-zenith-orange hover:text-black px-6 py-3 text-xs font-bold font-mono tracking-widest uppercase transition-all flex items-center gap-3 group shadow-[0_0_20px_rgba(255,77,0,0.1)]"
+            >
+                <Icons.Zap size={14} className="animate-pulse" />
+                <span>Quick Inject</span>
+            </button>
+
             <button 
               onClick={onSync}
               className="bg-zenith-surface border border-zenith-border text-zenith-muted hover:text-white px-4 py-3 text-xs font-mono tracking-widest uppercase transition-colors duration-75 flex items-center gap-2 group"

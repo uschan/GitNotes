@@ -173,7 +173,7 @@ const GraphView: React.FC<GraphViewProps> = ({ repos, activeRepoId, scope, onAdd
   }, [onDisconnectNodes]);
 
   return (
-    <div className="w-full h-[60vh] sm:h-[calc(100vh-180px)] border border-zenith-border bg-zenith-bg relative group overflow-hidden">
+    <div className="w-full h-full border border-zenith-border bg-zenith-bg relative group overflow-hidden">
         
         {/* Graph Search (Top Left) */}
         <div className="absolute top-4 left-4 z-10 flex gap-2 w-full max-w-xs pointer-events-none sm:pointer-events-auto">
